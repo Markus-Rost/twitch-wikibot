@@ -1,6 +1,3 @@
-const fs = require('fs');
-const process = JSON.parse(fs.readFileSync('config.json', 'utf8'));
-
 const TwitchJS = require('twitch-js');
 var request = require('request');
 
@@ -103,7 +100,7 @@ client.on( 'chat', function(channel, userstate, msg, self) {
 
 	// Do your stuff.
 	if ( msg.toLowerCase().startsWith(process.env.prefix) ) {
-		console.log( userstate['user-id'] + msg );
+		console.log( msg );
 		var args = msg.split(' ').slice(1);
 		if ( args[0] == 'setwiki' && args[1] && ( userstate.mod || userstate['user-id'] == userstate['room-id'] || userstate['user-id'] == process.env.owner ) ) {
 			var regex = /^(?:(?:https?:)?\/\/)?([a-z\d-]{1,30})/
