@@ -1,0 +1,17 @@
+{
+  "name": "twitch-bot",
+  "version": "1.0.0",
+  "description": "Ein Chat-Bot für Twitch um auf Gamepedia-Wikis zu verlinken",
+  "main": "app.js",
+  "scripts": {
+    "test": "node app.js debug",
+    "start": "node app.js"
+  },
+  "author": "MarkusRost",
+  "license": "ISC",
+  "dependencies": {
+    "npm": "^5.10.0",
+    "request": "^2.87.0",
+    "twitch-js": "^1.2.14"
+  }
+}
