@@ -17,29 +17,26 @@ var options = {
 	channels: [process.env.channel]
 }
 
-var client = new TwitchJS.client(options);
+var bot = new TwitchJS.client(options);
 
 var defaultWiki = process.env.wiki;
 
-client.on('connected', function(address, port) {
+bot.on('connected', function(address, port) {
 	console.log( 'Erfolgreich angemeldet!' );
 });
 
 function cmd_link(channel, msg, title, wiki) {
 	request( {
-		uri: 'https://' + wiki + '.gamepedia.com/api.php?action=query&format=json&meta=siteinfo&siprop=interwikimap&redirects=true&titles=' + encodeURI( title ),
+		uri: 'https://' + wiki + '.gamepedia.com/api.php?action=query&format=json&meta=siteinfo&siprop=general|interwikimap&redirects=true&titles=' + encodeURI( title ),
 		json: true
 	}, function( error, response, body ) {
 		if ( error || !response || !body || !body.query ) {
 			console.log( 'Fehler beim Erhalten der Suchergebnisse' + ( error ? ': ' + error.message : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
-			if ( response && response.request && response.request.uri && response.request.uri.href == 'https://www.gamepedia.com/' ) client.say( channel, 'This wiki does not exist!' );
-			else client.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + title.replace( / /g, '_' ) );
+			if ( response && response.request && response.request.uri && response.request.uri.href == 'https://www.gamepedia.com/' ) bot.say( channel, 'This wiki does not exist!' );
+			else bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + title.replace( / /g, '_' ) );
 		}
 		else {
-			if ( title == '' ) {
-				client.say( channel, 'https://' + wiki + '.gamepedia.com/' );
-			}
-			else if ( body.query.pages ) {
+			if ( body.query.pages ) {
 				if ( body.query.pages['-1'] && body.query.pages['-1'].missing != undefined ) {
 					request( {
 						uri: 'https://' + wiki + '.gamepedia.com/api.php?action=query&format=json&list=search&srnamespace=0|4|6|10|12|14&srsearch=' + encodeURI( title ) + '&srlimit=1',
@@ -47,23 +44,23 @@ function cmd_link(channel, msg, title, wiki) {
 					}, function( srerror, srresponse, srbody ) {
 						if ( srerror || !srresponse || !srbody || !srbody.query || ( !srbody.query.search[0] && srbody.query.searchinfo.totalhits != 0 ) ) {
 							console.log( 'Fehler beim Erhalten der Suchergebnisse' + ( srerror ? ': ' + srerror.message : ( srbody ? ( srbody.error ? ': ' + srbody.error.info : '.' ) : '.' ) ) );
-							client.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + title.replace( / /g, '_' ) );
+							bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + title.replace( / /g, '_' ) );
 						}
 						else {
 							if ( srbody.query.searchinfo.totalhits == 0 ) {
-								cmd_nofound(channel, title, wiki)
+								bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( https://' + wiki + '.gamepedia.com/' );
 							}
 							else if ( srbody.query.searchinfo.totalhits == 1 ) {
-								client.say( channel, 'I found only this: https://' + wiki + '.gamepedia.com/' + srbody.query.search[0].title.replace( / /g, '_' ) );
+								bot.say( channel, 'I found only this: https://' + wiki + '.gamepedia.com/' + srbody.query.search[0].title.replace( / /g, '_' ) );
 							}
 							else {
-								client.say( channel, 'I found this for you: https://' + wiki + '.gamepedia.com/' + srbody.query.search[0].title.replace( / /g, '_' ) );
+								bot.say( channel, 'I found this for you: https://' + wiki + '.gamepedia.com/' + srbody.query.search[0].title.replace( / /g, '_' ) );
 							}
 						}
 					} );
 				}
 				else {
-					client.say( channel, 'https://' + wiki + '.gamepedia.com/' + ( Object.values(body.query.pages)[0].title + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + encodeURI( body.query.redirects[0].tofragment ) : '' ) ).replace( / /g, '_' ) );
+					bot.say( channel, 'https://' + wiki + '.gamepedia.com/' + ( Object.values(body.query.pages)[0].title + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + encodeURI( body.query.redirects[0].tofragment ) : '' ) ).replace( / /g, '_' ) );
 				}
 			}
 			else if ( body.query.interwiki ) {
@@ -78,23 +75,19 @@ function cmd_link(channel, msg, title, wiki) {
 							var link = regex.exec(entry[i].url)[1];
 							cmd_link(channel, msg, iwtitle, link);
 						}
-						else client.say( channel, entry[i].url.replace( '$1', intertitle.replace( / /g, '_' ) ) );
+						else bot.say( channel, entry[i].url.replace( '$1', intertitle.replace( / /g, '_' ) ) );
 						break;
 					}
 				}
 			}
 			else {
-				cmd_nofound(channel, title, wiki);
+				bot.say( channel, 'https://' + wiki + '.gamepedia.com/' + body.query.general.mainpage.replace( / /g, '_' ) );
 			}
 		}
 	} );
 }
 
-function cmd_nofound(channel, title, wiki) {
-	client.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( https://' + wiki + '.gamepedia.com/' );
-}
-
-client.on( 'chat', function(channel, userstate, msg, self) {
+bot.on( 'chat', function(channel, userstate, msg, self) {
 	// Don't listen to my own messages..
 	if ( self ) return;
 
@@ -106,7 +99,7 @@ client.on( 'chat', function(channel, userstate, msg, self) {
 			var regex = /^(?:(?:https?:)?\/\/)?([a-z\d-]{1,30})/
 			if ( regex.test(args[1]) ) {
 				defaultWiki = regex.exec(args[1])[1];
-				client.say( channel, 'I changed the default wiki to: https://' + defaultWiki + '.gamepedia.com/' );
+				bot.say( channel, 'I changed the default wiki to: https://' + defaultWiki + '.gamepedia.com/' );
 			}
 			else {
 				cmd_link(channel, msg, args.join(' '), defaultWiki);
@@ -123,4 +116,4 @@ client.on( 'chat', function(channel, userstate, msg, self) {
 	}
 } );
 
-client.connect();
+bot.connect();
