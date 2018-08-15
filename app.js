@@ -97,8 +97,8 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 		var args = msg.split(' ').slice(1);
 		if ( args[0] == 'setwiki' && args[1] && ( userstate.mod || userstate['user-id'] == userstate['room-id'] || userstate['user-id'] == process.env.owner ) ) {
 			var regex = /^(?:(?:https?:)?\/\/)?([a-z\d-]{1,30})/
-			if ( regex.test(args[1]) ) {
-				defaultWiki = regex.exec(args[1])[1];
+			if ( regex.test(args[1].toLowerCase()) ) {
+				defaultWiki = regex.exec(args[1].toLowerCase())[1];
 				bot.say( channel, 'I changed the default wiki to: https://' + defaultWiki + '.gamepedia.com/' );
 			}
 			else {
