@@ -12,20 +12,187 @@ var options = {
 	},
 	identity:{
 		username: 'WikiBot',
-		password: process.env.token
-	},
-	channels: [process.env.channel]
+		password: process.env.oauth
+	}
 }
 
 var bot = new TwitchJS.client(options);
 
-var defaultWiki = process.env.wiki;
+var trysettings = 0;
+var botsettings = {};
+
+function getSettings() {
+	request( {
+		uri: process.env.read + process.env.file + process.env.access,
+		json: true
+	}, function( error, response, body ) {
+		if ( error || !response || !body || body.error ) {
+			console.log( trysettings + '. Fehler beim Erhalten der Einstellungen' + ( error ? ': ' + error.message : ( body ? ( body.error ? ': ' + body.error : '.' ) : '.' ) ) );
+			if ( trysettings < 10 ) {
+				trysettings++;
+				getSettings();
+			}
+		}
+		else {
+			console.log( 'Einstellungen erfolgreich ausgelesen.' );
+			botsettings = Object.assign({}, body);
+			for (var channel in botsettings) {
+				bot.join(channel);
+			}
+		}
+	} );
+}
 
 bot.on('connected', function(address, port) {
 	console.log( 'Erfolgreich angemeldet!' );
+	getSettings();
 });
 
-function cmd_link(channel, msg, title, wiki) {
+var cmds = {
+	setwiki: bot_setwiki,
+	eval: bot_eval,
+	join: bot_join,
+	leave: bot_leave
+}
+
+
+function bot_setwiki(channel, userstate, msg, args, wiki) {
+	if ( args[0] && ( userstate.mod || userstate['user-id'] == userstate['room-id'] || userstate['user-id'] == process.env.owner ) ) {
+		var regex = /^(?:(?:https?:)?\/\/)?([a-z\d-]{1,30})/
+		if ( regex.test(args[0].toLowerCase()) ) {
+			var wikinew = regex.exec(args[0].toLowerCase())[1];
+			if ( wiki == wikinew ) {
+				bot.say( channel, 'The default wiki is already set to: https://' + wiki + '.gamepedia.com/' );
+			}
+			else {
+				var temp_settings = Object.assign({}, botsettings);
+				temp_settings[channel] = wikinew;
+				request.post( {
+					uri: process.env.save + process.env.access,
+					body: {
+						branch: 'master',
+						commit_message: 'Einstellungen aktualisiert.',
+						actions: [
+							{
+								action: 'update',
+								file_path: process.env.file,
+								content: JSON.stringify( temp_settings, null, '\t' )
+							}
+						]
+					},
+					json: true
+				}, function( error, response, body ) {
+					if ( error || !response || response.statusCode != 201 || !body || body.error ) {
+						console.log( 'Fehler beim Bearbeiten' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
+						bot.say( channel, 'I couldn\'t change the default wiki :(' );
+					}
+					else {
+						botsettings = Object.assign({}, temp_settings);
+						console.log( 'Einstellungen erfolgreich aktualisiert.' );
+						bot.say( channel, 'I changed the default wiki to: https://' + botsettings[channel] + '.gamepedia.com/' );
+					}
+				} );
+			}
+		}
+		else {
+			bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
+		}
+	}
+	else {
+		bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
+	}
+}
+
+function bot_eval(channel, userstate, msg, args, wiki) {
+	if ( userstate['user-id'] == process.env.owner && args.length ) {
+		try {
+			var text = eval( args.join(' ') );
+		} catch ( error ) {
+			var text = error.name + ': ' + error.message;
+		}
+		console.log( text );
+		bot.say( channel, 'NomNom ' + text ).catch( err => bot.say( channel, err.name + ': ' + err.message ) );
+	} else {
+		bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
+	}
+}
+
+function bot_join(channel, userstate, msg, args, wiki) {
+	if ( args[0] && args[0].toLowerCase() == '@' + userstate.username ) {
+		if ( '#' + userstate.username in botsettings ) {
+			bot.say( channel, 'I already joined your stream @' + userstate['display-name'] );
+		}
+		else {
+			var temp_settings = Object.assign({}, botsettings);
+			temp_settings['#' + userstate.username] = wiki;
+			request.post( {
+				uri: process.env.save + process.env.access,
+				body: {
+					branch: 'master',
+					commit_message: 'Einstellungen aktualisiert.',
+					actions: [
+						{
+							action: 'update',
+							file_path: process.env.file,
+							content: JSON.stringify( temp_settings, null, '\t' )
+						}
+					]
+				},
+				json: true
+			}, function( error, response, body ) {
+				if ( error || !response || response.statusCode != 201 || !body || body.error ) {
+					console.log( 'Fehler beim Bearbeiten' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
+					bot.say( channel, 'I couldn\'t join your stream @' + userstate['display-name'] + ' :(' );
+				}
+				else {
+					botsettings = Object.assign({}, temp_settings);
+					console.log( 'Ich wurde zu einem Stream hinzugefügt.' );
+					bot.join('#' + userstate.username);
+					bot.say( channel, 'I joined your stream @' + userstate['display-name'] );
+				}
+			} );
+		}
+	} else {
+		bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
+	}
+}
+
+function bot_leave(channel, userstate, msg, args, wiki) {
+	if ( userstate['user-id'] == userstate['room-id'] && args[0] && args[0].toLowerCase() == '@' + userstate.username ) {
+		var temp_settings = Object.assign({}, botsettings);
+		delete temp_settings['#' + userstate.username];
+		request.post( {
+			uri: process.env.save + process.env.access,
+			body: {
+				branch: 'master',
+				commit_message: 'Einstellungen aktualisiert.',
+				actions: [
+					{
+						action: 'update',
+						file_path: process.env.file,
+						content: JSON.stringify( temp_settings, null, '\t' )
+					}
+				]
+			},
+			json: true
+		}, function( error, response, body ) {
+			if ( error || !response || response.statusCode != 201 || !body || body.error ) {
+				console.log( 'Fehler beim Bearbeiten' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
+				bot.say( channel, 'I couldn\'t leave your stream @' + userstate['display-name'] + ' :(' );
+			}
+			else {
+				botsettings = Object.assign({}, temp_settings);
+				bot.say( channel, 'I will leave your stream now @' + userstate['display-name'] );
+				console.log( 'Ich wurde von einem Stream entfernt.' );
+				bot.part('#' + userstate.username);
+			}
+		} );
+	} else {
+		bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
+	}
+}
+
+function bot_link(channel, msg, title, wiki) {
 	request( {
 		uri: 'https://' + wiki + '.gamepedia.com/api.php?action=query&format=json&meta=siteinfo&siprop=general|interwikimap&redirects=true&titles=' + encodeURI( title ),
 		json: true
@@ -73,7 +240,7 @@ function cmd_link(channel, msg, title, wiki) {
 						if ( regex.test(entry[i].url) ) {
 							var iwtitle = entry[i].url.replace( '$1', intertitle ).replace( regex.exec(entry[i].url)[0], '' );
 							var link = regex.exec(entry[i].url)[1];
-							cmd_link(channel, msg, iwtitle, link);
+							bot_link(channel, msg, iwtitle, link);
 						}
 						else bot.say( channel, entry[i].url.replace( '$1', intertitle.replace( / /g, '_' ) ) );
 						break;
@@ -93,25 +260,17 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 
 	// Do your stuff.
 	if ( msg.toLowerCase().startsWith(process.env.prefix) ) {
-		console.log( msg );
+		console.log( channel + ': ' + msg );
+		var wiki = botsettings[channel];
 		var args = msg.split(' ').slice(1);
-		if ( args[0] == 'setwiki' && args[1] && ( userstate.mod || userstate['user-id'] == userstate['room-id'] || userstate['user-id'] == process.env.owner ) ) {
-			var regex = /^(?:(?:https?:)?\/\/)?([a-z\d-]{1,30})/
-			if ( regex.test(args[1].toLowerCase()) ) {
-				defaultWiki = regex.exec(args[1].toLowerCase())[1];
-				bot.say( channel, 'I changed the default wiki to: https://' + defaultWiki + '.gamepedia.com/' );
-			}
-			else {
-				cmd_link(channel, msg, args.join(' '), defaultWiki);
-			}
+		if ( args[0] ) {
+			var invoke = args[0].toLowerCase()
+			if ( invoke in cmds ) cmds[invoke](channel, userstate, msg, args.slice(1), wiki);
+			else if ( invoke.startsWith('!') ) bot_link(channel, msg, args.slice(1).join(' '), invoke.substr(1));
+			else bot_link(channel, msg, args.join(' '), wiki);
 		}
 		else {
-			var wiki = defaultWiki;
-			if ( args[0] && args[0].startsWith('!') ) {
-				wiki = args[0].substr(1);
-				args = args.slice(1);
-			}
-			cmd_link(channel, msg, args.join(' '), wiki);
+			bot_link(channel, msg, args.join(' '), wiki);
 		}
 	}
 } );
