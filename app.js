@@ -55,7 +55,6 @@ var cmds = {
 	leave: bot_leave
 }
 
-
 function bot_setwiki(channel, userstate, msg, args, wiki) {
 	if ( args[0] && ( userstate.mod || userstate['user-id'] == userstate['room-id'] || userstate['user-id'] == process.env.owner ) ) {
 		var regex = /^(?:(?:https?:)?\/\/)?([a-z\d-]{1,30})/
@@ -71,7 +70,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 					uri: process.env.save + process.env.access,
 					body: {
 						branch: 'master',
-						commit_message: 'Einstellungen aktualisiert.',
+						commit_message: 'WikiBot: Einstellungen aktualisiert.',
 						actions: [
 							{
 								action: 'update',
@@ -129,7 +128,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 				uri: process.env.save + process.env.access,
 				body: {
 					branch: 'master',
-					commit_message: 'Einstellungen aktualisiert.',
+					commit_message: 'WikiBot: Einstellungen hinzugefügt.',
 					actions: [
 						{
 							action: 'update',
@@ -165,7 +164,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 			uri: process.env.save + process.env.access,
 			body: {
 				branch: 'master',
-				commit_message: 'Einstellungen aktualisiert.',
+				commit_message: 'WikiBot: Einstellungen entfernt.',
 				actions: [
 					{
 						action: 'update',
