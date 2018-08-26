@@ -205,7 +205,7 @@ function bot_link(channel, msg, title, wiki) {
 			if ( body.query.pages ) {
 				if ( body.query.pages['-1'] && body.query.pages['-1'].missing != undefined ) {
 					request( {
-						uri: 'https://' + wiki + '.gamepedia.com/api.php?action=query&format=json&list=search&srnamespace=0|4|6|10|12|14&srsearch=' + encodeURI( title ) + '&srlimit=1',
+						uri: 'https://' + wiki + '.gamepedia.com/api.php?action=query&format=json&list=search&srnamespace=0|4|12|14&srsearch=' + encodeURI( title ) + '&srlimit=1',
 						json: true
 					}, function( srerror, srresponse, srbody ) {
 						if ( srerror || !srresponse || !srbody || !srbody.query || ( !srbody.query.search[0] && srbody.query.searchinfo.totalhits != 0 ) ) {
@@ -258,7 +258,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 	if ( self ) return;
 
 	// Do your stuff.
-	if ( msg.toLowerCase().startsWith(process.env.prefix) ) {
+	if ( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() == process.env.prefix ) {
 		console.log( channel + ': ' + msg );
 		var wiki = botsettings[channel];
 		var args = msg.split(' ').slice(1);
