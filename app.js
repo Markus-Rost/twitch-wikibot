@@ -210,23 +210,23 @@ function bot_link(channel, msg, title, wiki) {
 					}, function( srerror, srresponse, srbody ) {
 						if ( srerror || !srresponse || !srbody || !srbody.query || ( !srbody.query.search[0] && srbody.query.searchinfo.totalhits != 0 ) ) {
 							console.log( 'Fehler beim Erhalten der Suchergebnisse' + ( srerror ? ': ' + srerror.message : ( srbody ? ( srbody.error ? ': ' + srbody.error.info : '.' ) : '.' ) ) );
-							bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + title.replace( / /g, '_' ) );
+							bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + encodeURI( title.replace( / /g, '_' ) ) );
 						}
 						else {
 							if ( srbody.query.searchinfo.totalhits == 0 ) {
 								bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( https://' + wiki + '.gamepedia.com/' );
 							}
 							else if ( srbody.query.searchinfo.totalhits == 1 ) {
-								bot.say( channel, 'I found only this: https://' + wiki + '.gamepedia.com/' + srbody.query.search[0].title.replace( / /g, '_' ) );
+								bot.say( channel, 'I found only this: https://' + wiki + '.gamepedia.com/' + encodeURI( srbody.query.search[0].title.replace( / /g, '_' ) ) );
 							}
 							else {
-								bot.say( channel, 'I found this for you: https://' + wiki + '.gamepedia.com/' + srbody.query.search[0].title.replace( / /g, '_' ) );
+								bot.say( channel, 'I found this for you: https://' + wiki + '.gamepedia.com/' + encodeURI( srbody.query.search[0].title.replace( / /g, '_' ) ) );
 							}
 						}
 					} );
 				}
 				else {
-					bot.say( channel, 'https://' + wiki + '.gamepedia.com/' + ( Object.values(body.query.pages)[0].title + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + encodeURI( body.query.redirects[0].tofragment ) : '' ) ).replace( / /g, '_' ) );
+					bot.say( channel, 'https://' + wiki + '.gamepedia.com/' + encodeURI( ( Object.values(body.query.pages)[0].title + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + body.query.redirects[0].tofragment : '' ) ).replace( / /g, '_' ) ) );
 				}
 			}
 			else if ( body.query.interwiki ) {
