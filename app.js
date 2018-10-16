@@ -37,7 +37,7 @@ function getSettings() {
 			console.log( 'Einstellungen erfolgreich ausgelesen.' );
 			botsettings = Object.assign({}, body);
 			for (var channel in botsettings) {
-				bot.join(channel);
+				bot.join(channel).catch( error => console.log( channel + ': ' + error ) );
 			}
 		}
 	} );
