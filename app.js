@@ -199,7 +199,7 @@ function bot_link(channel, msg, title, wiki) {
 		if ( error || !response || !body || !body.query ) {
 			console.log( 'Fehler beim Erhalten der Suchergebnisse' + ( error ? ': ' + error.message : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
 			if ( response && response.request && response.request.uri && response.request.uri.href == 'https://www.gamepedia.com/' ) bot.say( channel, 'This wiki does not exist!' );
-			else bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + encodeURIComponent( title.replace( / /g, '_' ) ) );
+			else bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + title.toTitle() );
 		}
 		else {
 			if ( body.query.pages ) {
@@ -210,23 +210,23 @@ function bot_link(channel, msg, title, wiki) {
 					}, function( srerror, srresponse, srbody ) {
 						if ( srerror || !srresponse || !srbody || !srbody.query || ( !srbody.query.search[0] && srbody.query.searchinfo.totalhits != 0 ) ) {
 							console.log( 'Fehler beim Erhalten der Suchergebnisse' + ( srerror ? ': ' + srerror.message : ( srbody ? ( srbody.error ? ': ' + srbody.error.info : '.' ) : '.' ) ) );
-							bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + encodeURIComponent( title.replace( / /g, '_' ) ) );
+							bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + title.toTitle() );
 						}
 						else {
 							if ( srbody.query.searchinfo.totalhits == 0 ) {
 								bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( https://' + wiki + '.gamepedia.com/' );
 							}
 							else if ( srbody.query.searchinfo.totalhits == 1 ) {
-								bot.say( channel, 'I found only this: https://' + wiki + '.gamepedia.com/' + encodeURIComponent( srbody.query.search[0].title.replace( / /g, '_' ) ) );
+								bot.say( channel, 'I found only this: https://' + wiki + '.gamepedia.com/' + srbody.query.search[0].title.toTitle() );
 							}
 							else {
-								bot.say( channel, 'I found this for you: https://' + wiki + '.gamepedia.com/' + encodeURIComponent( srbody.query.search[0].title.replace( / /g, '_' ) ) );
+								bot.say( channel, 'I found this for you: https://' + wiki + '.gamepedia.com/' + srbody.query.search[0].title.toTitle() );
 							}
 						}
 					} );
 				}
 				else {
-					bot.say( channel, 'https://' + wiki + '.gamepedia.com/' + encodeURIComponent( Object.values(body.query.pages)[0].title.replace( / /g, '_' ) ) + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + encodeURIComponent( body.query.redirects[0].tofragment.replace( / /g, '_' ) ).replace( /\%/g, '.' ) : '' ) );
+					bot.say( channel, 'https://' + wiki + '.gamepedia.com/' + Object.values(body.query.pages)[0].title.toTitle() + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + body.query.redirects[0].tofragment.toSection() : '' ) );
 				}
 			}
 			else if ( body.query.interwiki ) {
@@ -239,11 +239,19 @@ function bot_link(channel, msg, title, wiki) {
 				} else bot.say( channel, inter.url );
 			}
 			else {
-				bot.say( channel, 'https://' + wiki + '.gamepedia.com/' + encodeURIComponent( body.query.general.mainpage.replace( / /g, '_' ) ) );
+				bot.say( channel, 'https://' + wiki + '.gamepedia.com/' + body.query.general.mainpage.toTitle() );
 			}
 		}
 	} );
 }
+
+String.prototype.toTitle = function() {
+	return this.replace( / /g, '_' ).replace( /\'/g, '%27' ).replace( /\%/g, '%25' ).replace( /\?/g, '%3F' );
+};
+
+String.prototype.toSection = function() {
+	return encodeURIComponent( this.replace( / /g, '_' ) ).replace( /\'/g, '%27' ).replace( /\%/g, '.' );
+};
 
 bot.on( 'chat', function(channel, userstate, msg, self) {
 	// Don't listen to my own messages..
