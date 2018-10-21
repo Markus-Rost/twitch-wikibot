@@ -199,7 +199,7 @@ function bot_link(channel, msg, title, wiki) {
 		if ( error || !response || !body || !body.query ) {
 			console.log( 'Fehler beim Erhalten der Suchergebnisse' + ( error ? ': ' + error.message : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
 			if ( response && response.request && response.request.uri && response.request.uri.href == 'https://www.gamepedia.com/' ) bot.say( channel, 'This wiki does not exist!' );
-			else bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + title.toTitle() );
+			else bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/Special:Search/' + title.toTitle() );
 		}
 		else {
 			if ( body.query.pages ) {
@@ -210,7 +210,7 @@ function bot_link(channel, msg, title, wiki) {
 					}, function( srerror, srresponse, srbody ) {
 						if ( srerror || !srresponse || !srbody || !srbody.query || ( !srbody.query.search[0] && srbody.query.searchinfo.totalhits != 0 ) ) {
 							console.log( 'Fehler beim Erhalten der Suchergebnisse' + ( srerror ? ': ' + srerror.message : ( srbody ? ( srbody.error ? ': ' + srbody.error.info : '.' ) : '.' ) ) );
-							bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/' + title.toTitle() );
+							bot.say( channel, 'I got an error while searching: https://' + wiki + '.gamepedia.com/Special:Search/' + title.toTitle() );
 						}
 						else {
 							if ( srbody.query.searchinfo.totalhits == 0 ) {
