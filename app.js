@@ -61,7 +61,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 		if ( regex.test(args[0].toLowerCase()) ) {
 			var wikinew = regex.exec(args[0].toLowerCase())[1];
 			if ( wiki == wikinew ) {
-				bot.say( channel, 'The default wiki is already set to: https://' + wiki + '.gamepedia.com/' );
+				bot.say( channel, '@' + userstate['display-name'] + ', the default wiki is already set to: https://' + wiki + '.gamepedia.com/' );
 			}
 			else {
 				var temp_settings = Object.assign({}, botsettings);
@@ -83,12 +83,12 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 				}, function( error, response, body ) {
 					if ( error || !response || response.statusCode != 201 || !body || body.error ) {
 						console.log( 'Fehler beim Bearbeiten' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
-						bot.say( channel, 'I couldn\'t change the default wiki :(' );
+						bot.say( channel, '@' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
 					}
 					else {
 						botsettings = Object.assign({}, temp_settings);
 						console.log( 'Einstellungen erfolgreich aktualisiert.' );
-						bot.say( channel, 'I changed the default wiki to: https://' + botsettings[channel] + '.gamepedia.com/' );
+						bot.say( channel, '@' + userstate['display-name'] + ', I changed the default wiki to: https://' + botsettings[channel] + '.gamepedia.com/' );
 					}
 				} );
 			}
