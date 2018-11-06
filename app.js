@@ -204,7 +204,7 @@ function bot_link(channel, msg, title, wiki) {
 		}
 		else {
 			if ( body.query.pages ) {
-				if ( body.query.pages['-1'] && body.query.pages['-1'].missing != undefined ) {
+				if ( body.query.pages['-1'] && ( ( body.query.pages['-1'].missing != undefined && body.query.pages['-1'].known == undefined ) || body.query.pages['-1'].invalid != undefined ) ) {
 					request( {
 						uri: 'https://' + wiki + '.gamepedia.com/api.php?action=query&format=json&list=search&srnamespace=0|4|12|14|10000|10002|10004|10006|10008|10010&srsearch=' + encodeURI( title ) + '&srlimit=1',
 						json: true
