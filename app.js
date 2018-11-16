@@ -217,6 +217,9 @@ function bot_link(channel, msg, title, wiki) {
 							if ( srbody.query.searchinfo.totalhits == 0 ) {
 								bot.say( channel, kit + 'I couldn\'t find a result for "' + title + '" on this wiki :( https://' + wiki + '.gamepedia.com/' );
 							}
+							else if ( title.toTitle().toLowerCase() == srbody.query.search[0].title.toTitle().toLowerCase() ) {
+								bot.say( channel, 'https://' + wiki + '.gamepedia.com/' + srbody.query.search[0].title.toTitle() );
+							}
 							else if ( srbody.query.searchinfo.totalhits == 1 ) {
 								bot.say( channel, kit + 'I found only this: https://' + wiki + '.gamepedia.com/' + srbody.query.search[0].title.toTitle() );
 							}
@@ -251,7 +254,7 @@ String.prototype.toTitle = function() {
 };
 
 String.prototype.toSection = function() {
-	return encodeURIComponent( this.replace( / /g, '_' ) ).replace( /\'/g, '%27' ).replace( /\%/g, '.' );
+	return encodeURIComponent( this.replace( / /g, '_' ) ).replace( /\'/g, '%27' ).replace( /\(/g, '%28' ).replace( /\)/g, '%29' ).replace( /\%/g, '.' );
 };
 
 bot.on( 'chat', function(channel, userstate, msg, self) {
