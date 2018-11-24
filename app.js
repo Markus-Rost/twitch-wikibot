@@ -1,3 +1,4 @@
+require('dotenv').config();
 const TwitchJS = require('twitch-js');
 var request = require('request');
 
