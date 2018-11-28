@@ -24,11 +24,14 @@ var botsettings = {};
 
 function getSettings() {
 	request( {
-		uri: process.env.read + process.env.file + process.env.access,
+		uri: process.env.read + process.env.file + process.env.raw,
+		headers: {
+			'PRIVATE-TOKEN': process.env.access
+		},
 		json: true
 	}, function( error, response, body ) {
-		if ( error || !response || !body || body.error ) {
-			console.log( trysettings + '. Fehler beim Erhalten der Einstellungen' + ( error ? ': ' + error.message : ( body ? ( body.error ? ': ' + body.error : '.' ) : '.' ) ) );
+		if ( error || !response || response.statusCode != 200 || !body || body.message || body.error ) {
+			console.log( '- Fehler beim Erhalten der Einstellungen' + ( error ? ': ' + error : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
 			if ( trysettings < 10 ) {
 				trysettings++;
 				getSettings();
@@ -68,7 +71,10 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 				var temp_settings = Object.assign({}, botsettings);
 				temp_settings[channel] = wikinew;
 				request.post( {
-					uri: process.env.save + process.env.access,
+					uri: process.env.save,
+					headers: {
+						'PRIVATE-TOKEN': process.env.access
+					},
 					body: {
 						branch: 'master',
 						commit_message: 'WikiBot: Einstellungen aktualisiert.',
@@ -126,7 +132,10 @@ function bot_join(channel, userstate, msg, args, wiki) {
 			var temp_settings = Object.assign({}, botsettings);
 			temp_settings['#' + userstate.username] = wiki;
 			request.post( {
-				uri: process.env.save + process.env.access,
+				uri: process.env.save,
+				headers: {
+					'PRIVATE-TOKEN': process.env.access
+				},
 				body: {
 					branch: 'master',
 					commit_message: 'WikiBot: Einstellungen hinzugefügt.',
@@ -162,7 +171,10 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 		var temp_settings = Object.assign({}, botsettings);
 		delete temp_settings['#' + userstate.username];
 		request.post( {
-			uri: process.env.save + process.env.access,
+			uri: process.env.save,
+			headers: {
+				'PRIVATE-TOKEN': process.env.access
+			},
 			body: {
 				branch: 'master',
 				commit_message: 'WikiBot: Einstellungen entfernt.',
