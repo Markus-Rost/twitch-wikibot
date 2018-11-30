@@ -1,7 +1,7 @@
 {
   "name": "twitch-bot",
   "version": "1.0.0",
-  "description": "Ein Chat-Bot für Twitch um auf Gamepedia-Wikis zu verlinken",
+  "description": "WikiBot is a bot for Twitch with the purpose to easily link to Gamepedia wikis.",
   "main": "app.js",
   "scripts": {
     "test": "node app.js debug",
@@ -10,9 +10,24 @@
   "author": "MarkusRost",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^6.1.0",
     "npm": "^5.10.0",
     "request": "^2.87.0",
-    "dotenv": "^6.1.0",
     "twitch-js": "^1.2.14"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Markus-Rost/twitch-wikibot.git"
+  },
+  "keywords": [
+    "gamepedia",
+    "twitch",
+    "wikibot",
+    "wiki",
+    "twitch-bot"
+  ],
+  "bugs": {
+    "url": "https://github.com/Markus-Rost/twitch-wikibot/issues"
+  },
+  "homepage": "https://github.com/Markus-Rost/twitch-wikibot#readme"
 }
