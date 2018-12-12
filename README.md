@@ -4,7 +4,8 @@ He always searches for the best result for the provided search term. He is able 
 
 ### WikiBot is not affiliated with Curse/Gamepedia and is an unofficial tool!
 
-Support server: [https://discord.gg/v77RTk5](https://discord.gg/v77RTk5)
+Twitch channel: [https://www.twitch.tv/WikiBot](https://www.twitch.tv/WikiBot)
+<br>Support server: [https://discord.gg/v77RTk5](https://discord.gg/v77RTk5)
 
 # Commands
 ### `!wiki <search term>`
