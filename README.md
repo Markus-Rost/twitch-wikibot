@@ -1,4 +1,4 @@
-# WikiBot
+# [WikiBot](https://www.twitch.tv/WikiBot)
 **WikiBot** is a [Twitch](https://www.twitch.tv/) chat bot with the purpose to easily link to [Gamepedia wikis](https://www.gamepedia.com/).
 He always searches for the best result for the provided search term. He is able resolve redirects and follow interwiki links.
 
