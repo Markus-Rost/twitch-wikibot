@@ -2,19 +2,23 @@ require('dotenv').config();
 const TwitchJS = require('twitch-js');
 var request = require('request');
 
+const isDebug = ( process.argv[2] == 'debug' ? true : false );
+
 var options = {
 	options: {
-		debug: false
+		clientId: process.env.client,
+		debug: isDebug
 	},
 	connection: {
 		cluster: 'aws',
 		reconnect: true,
 		secure: true
 	},
-	identity:{
+	identity: {
 		username: 'WikiBot',
 		password: process.env.oauth
-	}
+	},
+	channels: []
 }
 
 var bot = new TwitchJS.client(options);
