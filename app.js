@@ -294,4 +294,8 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 	}
 } );
 
+bot.on( 'notice', function(channel, msgid, msg) {
+	console.log( channel + ': ' + msg );
+} );
+
 bot.connect();
