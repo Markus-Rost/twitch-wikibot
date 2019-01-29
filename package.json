@@ -10,8 +10,8 @@
   "author": "MarkusRost",
   "license": "ISC",
   "dependencies": {
-    "dotenv": "^6.1.0",
-    "npm": "^5.10.0",
+    "dotenv": "^6.2.0",
+    "npm": "^6.7.0",
     "request": "^2.88.0",
     "twitch-js": "^1.2.17"
   },
