@@ -254,7 +254,7 @@ function bot_link(channel, msg, title, wiki) {
 				var intertitle = inter.title.substr(inter.iw.length+1);
 				var regex = /^(?:https?:)?\/\/(.*)\.gamepedia\.com\//.exec(inter.url);
 				if ( regex !== null ) {
-					var iwtitle = decodeURIComponent( inter.url.replace( regex[0], '' ) ).replace( /\_/g, ' ' ).replace( intertitle.replace( /\_/g, ' ' ), intertitle );
+					var iwtitle = decodeURIComponent( inter.url.replace( regex[0], '' ) ).replace( /\_/g, ' ' ).replaceSave( intertitle.replace( /\_/g, ' ' ), intertitle );
 					bot_link(channel, msg, iwtitle, regex[1]);
 				} else bot.say( channel, inter.url );
 			}
@@ -271,6 +271,10 @@ String.prototype.toTitle = function() {
 
 String.prototype.toSection = function() {
 	return encodeURIComponent( this.replace( / /g, '_' ) ).replace( /\'/g, '%27' ).replace( /\(/g, '%28' ).replace( /\)/g, '%29' ).replace( /\%/g, '.' );
+};
+
+String.prototype.replaceSave = function(pattern, replacement) {
+	return this.replace( pattern, replacement.replace( '$', '$$$$' ) );
 };
 
 bot.on( 'chat', function(channel, userstate, msg, self) {
