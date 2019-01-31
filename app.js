@@ -289,7 +289,7 @@ String.prototype.toSection = function() {
 };
 
 String.prototype.replaceSave = function(pattern, replacement) {
-	return this.replace( pattern, replacement.replace( '$', '$$$$' ) );
+	return this.replace( pattern, ( typeof replacement === 'string' ? replacement.replace( '$', '$$$$' ) : replacement ) );
 };
 
 bot.on( 'chat', function(channel, userstate, msg, self) {
