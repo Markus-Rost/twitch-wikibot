@@ -42,7 +42,7 @@ function getSettings() {
 			}
 		}
 		else {
-			console.log( 'Einstellungen erfolgreich ausgelesen.' );
+			console.log( '- Einstellungen erfolgreich ausgelesen.' );
 			botsettings = Object.assign({}, body);
 			for (var channel in botsettings) {
 				bot.join(channel).catch( error => console.log( channel + ': ' + error ) );
@@ -69,7 +69,7 @@ function getAllSites() {
 }
 
 bot.on('connected', function(address, port) {
-	console.log( 'Erfolgreich angemeldet!' );
+	console.log( '- Erfolgreich angemeldet!' );
 	getSettings();
 	getAllSites()
 });
@@ -117,12 +117,12 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 					json: true
 				}, function( error, response, body ) {
 					if ( error || !response || response.statusCode !== 201 || !body || body.error ) {
-						console.log( 'Fehler beim Bearbeiten' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
+						console.log( '- Fehler beim Bearbeiten' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
 						bot.say( channel, '@' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
 					}
 					else {
 						botsettings = Object.assign({}, temp_settings);
-						console.log( 'Einstellungen erfolgreich aktualisiert.' );
+						console.log( '- Einstellungen erfolgreich aktualisiert.' );
 						bot.say( channel, '@' + userstate['display-name'] + ', I changed the default wiki to: ' + botsettings[channel] );
 					}
 				} );
@@ -178,12 +178,12 @@ function bot_join(channel, userstate, msg, args, wiki) {
 				json: true
 			}, function( error, response, body ) {
 				if ( error || !response || response.statusCode !== 201 || !body || body.error ) {
-					console.log( 'Fehler beim Bearbeiten' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
+					console.log( '- Fehler beim Bearbeiten' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
 					bot.say( channel, 'I couldn\'t join your stream @' + userstate['display-name'] + ' :(' );
 				}
 				else {
 					botsettings = Object.assign({}, temp_settings);
-					console.log( 'Ich wurde zu einem Stream hinzugefügt.' );
+					console.log( '- Ich wurde zu einem Stream hinzugefügt.' );
 					bot.join('#' + userstate.username);
 					bot.say( channel, 'I joined your stream @' + userstate['display-name'] );
 				}
@@ -217,13 +217,13 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 			json: true
 		}, function( error, response, body ) {
 			if ( error || !response || response.statusCode !== 201 || !body || body.error ) {
-				console.log( 'Fehler beim Bearbeiten' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
+				console.log( '- Fehler beim Bearbeiten' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
 				bot.say( channel, 'I couldn\'t leave your stream @' + userstate['display-name'] + ' :(' );
 			}
 			else {
 				botsettings = Object.assign({}, temp_settings);
 				bot.say( channel, 'I will leave your stream now @' + userstate['display-name'] );
-				console.log( 'Ich wurde von einem Stream entfernt.' );
+				console.log( '- Ich wurde von einem Stream entfernt.' );
 				bot.part('#' + userstate.username);
 			}
 		} );
@@ -264,7 +264,7 @@ function bot_link(channel, msg, title, wiki) {
 						json: true
 					}, function( srerror, srresponse, srbody ) {
 						if ( srerror || !srresponse || srresponse.statusCode !== 200 || !srbody ) {
-							console.log( 'Fehler beim Erhalten der Suchergebnisse' + ( srerror ? ': ' + srerror : ( srbody ? ( srbody.error ? ': ' + srbody.error.info : '.' ) : '.' ) ) );
+							console.log( '- Fehler beim Erhalten der Suchergebnisse' + ( srerror ? ': ' + srerror : ( srbody ? ( srbody.error ? ': ' + srbody.error.info : '.' ) : '.' ) ) );
 							bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search/' + title.toTitle() );
 						}
 						else {
