@@ -16,12 +16,19 @@ var options = {
 	},
 	identity: {
 		username: 'WikiBot',
-		password: process.env.oauth
+		password: 'oauth:' + process.env.oauth
 	},
 	channels: []
 }
 
 var bot = new TwitchJS.client(options);
+
+var access = {'PRIVATE-TOKEN': process.env.access};
+var kraken = {
+	Accept: 'application/vnd.twitchtv.v5+json',
+	'Client-ID': process.env.client,
+	Authorization: 'OAuth ' + process.env.oauth
+}
 
 var trysettings = 0;
 var botsettings = {};
@@ -29,9 +36,7 @@ var botsettings = {};
 function getSettings() {
 	request( {
 		uri: process.env.read + process.env.file + process.env.raw,
-		headers: {
-			'PRIVATE-TOKEN': process.env.access
-		},
+		headers: access,
 		json: true
 	}, function( error, response, body ) {
 		if ( error || !response || response.statusCode !== 200 || !body || body.message || body.error ) {
@@ -100,9 +105,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 				temp_settings[channel] = wikinew;
 				request.post( {
 					uri: process.env.save,
-					headers: {
-						'PRIVATE-TOKEN': process.env.access
-					},
+					headers: access,
 					body: {
 						branch: 'master',
 						commit_message: 'WikiBot: Einstellungen aktualisiert.',
@@ -161,9 +164,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 			temp_settings['#' + userstate.username] = wiki;
 			request.post( {
 				uri: process.env.save,
-				headers: {
-					'PRIVATE-TOKEN': process.env.access
-				},
+				headers: access,
 				body: {
 					branch: 'master',
 					commit_message: 'WikiBot: Einstellungen hinzugefügt.',
@@ -186,6 +187,16 @@ function bot_join(channel, userstate, msg, args, wiki) {
 					console.log( '- Ich wurde zu einem Stream hinzugefügt.' );
 					bot.join('#' + userstate.username);
 					bot.say( channel, 'I joined your stream @' + userstate['display-name'] );
+					
+					request.put( {
+						url:'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'],
+						headers: kraken,
+						json: true
+					}, function( error, response, body ) {
+						if ( error || !response || response.statusCode !== 200 || !body ) {
+							console.log( '- Fehler beim Folgen von ' + userstate['display-name'] + ( error ? ': ' + error.message : '.' ) );
+						} else console.log( '- Ich folge nun ' + userstate['display-name'] + '.' );
+					} );
 				}
 			} );
 		}
@@ -200,9 +211,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 		delete temp_settings['#' + userstate.username];
 		request.post( {
 			uri: process.env.save,
-			headers: {
-				'PRIVATE-TOKEN': process.env.access
-			},
+			headers: access,
 			body: {
 				branch: 'master',
 				commit_message: 'WikiBot: Einstellungen entfernt.',
@@ -225,6 +234,16 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 				bot.say( channel, 'I will leave your stream now @' + userstate['display-name'] );
 				console.log( '- Ich wurde von einem Stream entfernt.' );
 				bot.part('#' + userstate.username);
+				
+				request.delete( {
+					url:'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'],
+					headers: kraken,
+					json: true
+				}, function( error, response, body ) {
+					if ( error || !response || response.statusCode !== 204 || body ) {
+						console.log( '- Fehler beim Entfolgen von ' + userstate['display-name'] + ( error ? ': ' + error.message : '.' ) );
+					} else console.log( '- Ich folge ' + userstate['display-name'] + ' nicht mehr.' );
+				} );
 			}
 		} );
 	} else {
