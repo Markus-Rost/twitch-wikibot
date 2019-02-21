@@ -1,4 +1,7 @@
 require('dotenv').config();
+const util = require('util');
+util.inspect.defaultOptions = {compact:false,breakLength:Infinity};
+
 const TwitchJS = require('twitch-js');
 var request = require('request');
 
@@ -140,15 +143,16 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 	}
 }
 
-function bot_eval(channel, userstate, msg, args, wiki) {
+async function bot_eval(channel, userstate, msg, args, wiki) {
 	if ( userstate['user-id'] === process.env.owner && args.length ) {
 		try {
-			var text = eval( args.join(' ') );
+			var text = util.inspect( await eval( args.join(' ') ) );
 		} catch ( error ) {
 			var text = error.name + ': ' + error.message;
 		}
-		console.log( text );
-		bot.say( channel, 'NomNom ' + text ).catch( err => bot.say( channel, err.name + ': ' + err.message ) );
+		console.log( '--- EVAL START ---\n\u200b' + text.replace( /\n/g, '\n\u200b' ) + '\n--- EVAL END ---' );
+		if ( text.length > 450 ) msg.reactEmoji('✅', true);
+		else bot.say( channel, 'MrDestructoid ' + text ).catch( err => bot.say( channel, err.name + ': ' + err.message ) );
 	} else {
 		bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
 	}
