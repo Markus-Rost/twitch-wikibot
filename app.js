@@ -2,7 +2,7 @@ require('dotenv').config();
 const TwitchJS = require('twitch-js');
 var request = require('request');
 
-const isDebug = ( process.argv[2] === 'debug' ? true : false );
+var isDebug = ( process.argv[2] === 'debug' ? true : false );
 
 var options = {
 	options: {
@@ -23,8 +23,8 @@ var options = {
 
 var bot = new TwitchJS.client(options);
 
-var access = {'PRIVATE-TOKEN': process.env.access};
-var kraken = {
+const access = {'PRIVATE-TOKEN': process.env.access};
+const kraken = {
 	Accept: 'application/vnd.twitchtv.v5+json',
 	'Client-ID': process.env.client,
 	Authorization: 'OAuth ' + process.env.oauth
