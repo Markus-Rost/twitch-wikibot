@@ -151,7 +151,7 @@ async function bot_eval(channel, userstate, msg, args, wiki) {
 			var text = error.name + ': ' + error.message;
 		}
 		console.log( '--- EVAL START ---\n\u200b' + text.replace( /\n/g, '\n\u200b' ) + '\n--- EVAL END ---' );
-		if ( text.length > 450 ) msg.reactEmoji('✅', true);
+		if ( text.length > 450 ) bot.say( channel, 'MrDestructoid ✅' ).catch( err => bot.say( channel, err.name + ': ' + err.message ) );
 		else bot.say( channel, 'MrDestructoid ' + text ).catch( err => bot.say( channel, err.name + ': ' + err.message ) );
 	} else {
 		bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
