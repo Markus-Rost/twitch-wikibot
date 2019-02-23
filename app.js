@@ -5,6 +5,8 @@ util.inspect.defaultOptions = {compact:false,breakLength:Infinity};
 const TwitchJS = require('twitch-js');
 var request = require('request');
 
+var isDebug = ( process.argv[2] === 'debug' ? true : false );
+
 var options = {
 	options: {
 		clientId: process.env.client,
@@ -24,7 +26,6 @@ var options = {
 
 var bot = new TwitchJS.client(options);
 
-var isDebug = ( process.argv[2] === 'debug' ? true : false );
 const access = {'PRIVATE-TOKEN': process.env.access};
 const kraken = {
 	Accept: 'application/vnd.twitchtv.v5+json',
