@@ -5,8 +5,6 @@ util.inspect.defaultOptions = {compact:false,breakLength:Infinity};
 const TwitchJS = require('twitch-js');
 var request = require('request');
 
-var isDebug = ( process.argv[2] === 'debug' ? true : false );
-
 var options = {
 	options: {
 		clientId: process.env.client,
@@ -26,6 +24,7 @@ var options = {
 
 var bot = new TwitchJS.client(options);
 
+var isDebug = ( process.argv[2] === 'debug' ? true : false );
 const access = {'PRIVATE-TOKEN': process.env.access};
 const kraken = {
 	Accept: 'application/vnd.twitchtv.v5+json',
@@ -59,8 +58,8 @@ function getSettings() {
 	} );
 }
 
-var defaultSites = [];
-var allSites = defaultSites;
+var allSites = [];
+
 function getAllSites() {
 	request( {
 		uri: 'https://help.gamepedia.com/api.php?action=allsites&formatversion=2&do=getSiteStats&filter=wikis|wiki_domain,wiki_display_name,wiki_managers,official_wiki,created,ss_good_articles,ss_total_pages,ss_total_edits,ss_active_users&format=json',
@@ -268,7 +267,7 @@ function bot_link(channel, msg, title, wiki) {
 			}
 			else {
 				console.log( '- Fehler beim Erhalten der Suchergebnisse' + ( error ? ': ' + error : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
-				bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search/' + title.toTitle() );
+				bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + ( title ? 'Special:Search/' + title.toTitle() : '' ) );
 			}
 		}
 		else {
@@ -360,7 +359,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 
 	// Do your stuff.
 	if ( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix ) {
-		if ( allSites === defaultSites ) getAllSites();
+		if ( !allSites.length ) getAllSites();
 		console.log( channel + ': ' + msg );
 		var wiki = botsettings[channel];
 		var args = msg.split(' ').slice(1);
