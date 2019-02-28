@@ -33,7 +33,7 @@ const kraken = {
 	Authorization: 'OAuth ' + process.env.oauth
 }
 
-var trysettings = 0;
+var trysettings = 1;
 var botsettings = {};
 
 function getSettings() {
