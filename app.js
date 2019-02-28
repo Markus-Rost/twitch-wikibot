@@ -332,7 +332,7 @@ function bot_link(channel, msg, title, wiki) {
 			else {
 				var text = wiki.toLink() + body.query.general.mainpage.toTitle();
 				request( {
-					uri: wiki + '/api.php?action=query' + ( noRedirect ? '' : '&redirects=true' ) + '&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json',
+					uri: wiki + '/api.php?action=query&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json',
 					json: true
 				}, function( mperror, mpresponse, mpbody ) {
 					if ( mperror || !mpresponse || mpresponse.statusCode !== 200 || !mpbody || !mpbody.query ) {
