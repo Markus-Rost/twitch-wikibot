@@ -258,7 +258,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 function bot_link(channel, msg, title, wiki) {
 	if ( title.length > 300 ) title = title.substr(0, 300);
 	request( {
-		uri: wiki + '/api.php?action=query&format=json&meta=siteinfo&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=extracts&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURI( title ),
+		uri: wiki + '/api.php?action=query&format=json&meta=siteinfo&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURI( title ),
 		json: true
 	}, function( error, response, body ) {
 		if ( error || !response || response.statusCode !== 200 || !body || !body.query ) {
@@ -283,7 +283,7 @@ function bot_link(channel, msg, title, wiki) {
 					
 				if ( ( querypage.missing !== undefined && querypage.known === undefined ) || querypage.invalid !== undefined ) {
 					request( {
-						uri: wiki + '/api.php?action=query&format=json&prop=extracts&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=4|12|14|' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrsearch=' + encodeURI( title ) + '&gsrlimit=1',
+						uri: wiki + '/api.php?action=query&format=json&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=4|12|14|' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrsearch=' + encodeURI( title ) + '&gsrlimit=1',
 						json: true
 					}, function( srerror, srresponse, srbody ) {
 						if ( srerror || !srresponse || srresponse.statusCode !== 200 || !srbody ) {
@@ -296,7 +296,9 @@ function bot_link(channel, msg, title, wiki) {
 							}
 							else {
 								querypage = Object.values(srbody.query.pages)[0];
-								var text = wiki.toLink() + querypage.title.toTitle() + ( querypage.extract ? ' – ' + querypage.extract : '' );
+								var text = wiki.toLink() + querypage.title.toTitle();
+								if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
+								else if ( querypage.extract ) text += ' – ' + querypage.extract;
 								if ( title.replace( /\-/g, ' ' ).toTitle().toLowerCase() === querypage.title.replace( /\-/g, ' ' ).toTitle().toLowerCase() ) {
 									text = text;
 								}
@@ -312,7 +314,9 @@ function bot_link(channel, msg, title, wiki) {
 					} );
 				}
 				else {
-					var text = wiki.toLink() + querypage.title.toTitle() + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + body.query.redirects[0].tofragment.toSection() : '' ) + ( querypage.extract ? ' – ' + querypage.extract : '' );
+					var text = wiki.toLink() + querypage.title.toTitle() + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + body.query.redirects[0].tofragment.toSection() : '' );
+					if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
+					else if ( querypage.extract ) text += ' – ' + querypage.extract;
 					bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
 				}
 			}
@@ -326,7 +330,21 @@ function bot_link(channel, msg, title, wiki) {
 				} else bot.say( channel, inter.url );
 			}
 			else {
-				bot.say( channel, wiki.toLink() + body.query.general.mainpage.toTitle() );
+				var text = wiki.toLink() + body.query.general.mainpage.toTitle();
+				request( {
+					uri: wiki + '/api.php?action=query' + ( noRedirect ? '' : '&redirects=true' ) + '&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json',
+					json: true
+				}, function( mperror, mpresponse, mpbody ) {
+					if ( mperror || !mpresponse || mpresponse.statusCode !== 200 || !mpbody || !mpbody.query ) {
+						console.log( '- Fehler beim Erhalten der Hauptseite' + ( error ? ': ' + error : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
+					} else {
+						querypage = Object.values(mpbody.query.pages)[0];
+						if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
+						else if ( querypage.extract ) text += ' – ' + querypage.extract;
+					}
+					
+					bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+				} );
 			}
 		}
 	} );
