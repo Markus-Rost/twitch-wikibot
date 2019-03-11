@@ -396,7 +396,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 } );
 
 bot.on( 'notice', function(channel, msgid, msg) {
-	console.log( channel + ': ' + msg );
+	if ( msgid !== 'host_target_went_offline' ) console.log( channel + ': ' + msg );
 } );
 
 bot.connect();
