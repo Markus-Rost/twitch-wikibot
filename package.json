@@ -1,6 +1,6 @@
 {
   "name": "twitch-bot",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "WikiBot is a bot for Twitch with the purpose to easily link to Gamepedia and Fandom wikis.",
   "main": "app.js",
   "scripts": {

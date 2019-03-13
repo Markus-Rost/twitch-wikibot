@@ -71,7 +71,7 @@ function getAllSites() {
 		}
 		else {
 			console.log( '- Wikis erfolgreich ausgelesen.' );
-			allSites = Object.assign([], body.data.wikis.filter( site => /^[a-z\d-]{1,30}\.gamepedia\.com$/.test(site.wiki_domain) ));
+			allSites = Object.assign([], body.data.wikis.filter( site => /^[a-z\d-]{1,50}\.gamepedia\.com$/.test(site.wiki_domain) ));
 		}
 	} );
 }
@@ -95,9 +95,12 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 		var wikinew = '';
 		if ( allSites.some( site => site.wiki_domain === args[0] + '.gamepedia.com' ) ) wikinew = 'https://' + args[0] + '.gamepedia.com/';
 		else {
-			var regex = args[0].match( /^(?:https?:\/\/)?(([a-z\d\.-]{1,30})\.(?:gamepedia|wikia|fandom)\.com(?:(?!\/wiki\/)\/[a-z-]{1,8})?)/ );
-			if ( regex !== null ) wikinew = ( regex[2].includes( '.' ) ? 'http://' : 'https://' ) + regex[1] + '/';
-			else if ( /^[a-z\d\.-]{1,30}$/.test( args[0] ) ) wikinew = ( args[0].includes( '.' ) ? 'http://' : 'https://' ) + args[0] + '.wikia.com/';
+			var regex = args[0].match( /^(?:https:\/\/)?([a-z\d-]{1,50}\.(?:gamepedia\.com|fandom\.com(?:(?!\/wiki\/)\/[a-z-]{1,8})?))(?:\/|$)/ );
+			if ( regex !== null ) wikinew = 'https://' + regex[1] + '/';
+			else if ( /^(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(args[0]) ) {
+				if ( args[0].includes( '.' ) ) wikinew = 'https://' + args[0].split('.')[1] + '.fandom.com/' + args[0].split('.')[0] + '/';
+				else wikinew = 'https://' + args[0] + '.fandom.com/';
+			}
 		}
 		if ( wikinew ) {
 			if ( wiki === wikinew ) {
@@ -257,8 +260,9 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 
 function bot_link(channel, msg, title, wiki) {
 	if ( title.length > 300 ) title = title.substr(0, 300);
+				console.log( wiki );
 	request( {
-		uri: wiki + '/api.php?action=query&format=json&meta=siteinfo&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURI( title ),
+		uri: wiki + 'api.php?action=query&meta=siteinfo&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURI( title ) + '&format=json',
 		json: true
 	}, function( error, response, body ) {
 		if ( error || !response || response.statusCode !== 200 || !body || !body.query ) {
@@ -268,6 +272,8 @@ function bot_link(channel, msg, title, wiki) {
 			}
 			else {
 				console.log( '- Fehler beim Erhalten der Suchergebnisse' + ( error ? ': ' + error : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
+				console.log( response.request.uri );
+				console.log( wiki );
 				bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + ( title ? 'Special:Search/' + title.toTitle() : '' ) );
 			}
 		}
@@ -283,7 +289,7 @@ function bot_link(channel, msg, title, wiki) {
 					
 				if ( ( querypage.missing !== undefined && querypage.known === undefined ) || querypage.invalid !== undefined ) {
 					request( {
-						uri: wiki + '/api.php?action=query&format=json&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=4|12|14|' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrsearch=' + encodeURI( title ) + '&gsrlimit=1',
+						uri: wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=4|12|14|' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrsearch=' + encodeURI( title ) + '&gsrlimit=1&format=json',
 						json: true
 					}, function( srerror, srresponse, srbody ) {
 						if ( srerror || !srresponse || srresponse.statusCode !== 200 || !srbody ) {
@@ -323,16 +329,16 @@ function bot_link(channel, msg, title, wiki) {
 			else if ( body.query.interwiki ) {
 				var inter = body.query.interwiki[0];
 				var intertitle = inter.title.substr(inter.iw.length+1);
-				var regex = inter.url.match( /^(https?:\/\/[a-z\d\.-]{1,30}\.(?:gamepedia|wikia|fandom)\.com\/(?:(?!wiki\/)[a-z-]{1,8}\/)?)(?:wiki\/)?/ );
+				var regex = inter.url.match( /^https:\/\/[a-z\d-]{1,50}\.(?:gamepedia\.com|fandom\.com(?:(?!\/wiki\/)\/[a-z-]{1,8})?(\/wiki))\// );
 				if ( regex !== null ) {
 					var iwtitle = decodeURIComponent( inter.url.replace( regex[0], '' ) ).replace( /\_/g, ' ' ).replaceSave( intertitle.replace( /\_/g, ' ' ), intertitle );
-					bot_link(channel, msg, iwtitle, regex[1]);
+					bot_link(channel, msg, iwtitle, regex[0].replace( regex[1], '' ));
 				} else bot.say( channel, inter.url );
 			}
 			else {
 				var text = wiki.toLink() + body.query.general.mainpage.toTitle();
 				request( {
-					uri: wiki + '/api.php?action=query&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json',
+					uri: wiki + 'api.php?action=query&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json',
 					json: true
 				}, function( mperror, mpresponse, mpbody ) {
 					if ( mperror || !mpresponse || mpresponse.statusCode !== 200 || !mpbody || !mpbody.query ) {
@@ -351,12 +357,12 @@ function bot_link(channel, msg, title, wiki) {
 }
 
 String.prototype.noWiki = function() {
-	if ( /^https:\/\/[a-z\d-]{1,30}\.gamepedia\.com\/$/.test(this) ) return 'https://www.gamepedia.com/';
-	else return this.replace( /^https?:\/\/([a-z\d\.-]{1,30}\.(?:wikia|fandom)\.com)\/(?:[a-z-]{1,8}\/)?$/, 'http://community.wikia.com/wiki/Community_Central:Not_a_valid_community?from=$1' );
+	if ( /^https:\/\/[a-z\d-]{1,50}\.gamepedia\.com\/$/.test(this) ) return 'https://www.gamepedia.com/';
+	else return this.replace( /^https:\/\/([a-z\d-]{1,50}\.fandom\.com)\/(?:[a-z-]{1,8}\/)?$/, 'https://community.fandom.com/wiki/Community_Central:Not_a_valid_community?from=$1' );
 };
 
 String.prototype.toLink = function() {
-	if ( /^https:\/\/[a-z\d-]{1,30}\.gamepedia\.com\/$/.test(this) ) return this;
+	if ( /^https:\/\/[a-z\d-]{1,50}\.gamepedia\.com\/$/.test(this) ) return this;
 	else return this + 'wiki/';
 };
 
@@ -385,8 +391,12 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 		if ( args[0] ) {
 			var invoke = args[0].toLowerCase()
 			if ( invoke in cmds ) cmds[invoke](channel, userstate, msg, args.slice(1), wiki);
-			else if ( invoke.startsWith('!') ) bot_link(channel, msg, args.slice(1).join(' '), 'https://' + invoke.substr(1) + '.gamepedia.com/');
-			else if ( invoke.startsWith('?') ) bot_link(channel, msg, args.slice(1).join(' '), ( invoke.includes( '.' ) ? 'http://' : 'https://' ) + invoke.substr(1) + '.wikia.com/');
+			else if ( /^![a-z\d-]{1,50}$/.test(invoke) ) bot_link(channel, msg, args.slice(1).join(' '), 'https://' + invoke.substr(1) + '.gamepedia.com/');
+			else if ( /^\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
+				if ( invoke.includes( '.' ) ) wiki = 'https://' + invoke.split('.')[1] + '.fandom.com/' + invoke.substr(1).split('.')[0] + '/';
+				else wiki = 'https://' + invoke.substr(1) + '.fandom.com/';
+				bot_link(channel, msg, args.slice(1).join(' '), wiki);
+			}
 			else bot_link(channel, msg, args.join(' '), wiki);
 		}
 		else {
