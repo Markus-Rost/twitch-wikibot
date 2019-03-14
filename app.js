@@ -260,7 +260,6 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 
 function bot_link(channel, msg, title, wiki) {
 	if ( title.length > 300 ) title = title.substr(0, 300);
-				console.log( wiki );
 	request( {
 		uri: wiki + 'api.php?action=query&meta=siteinfo&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURI( title ) + '&format=json',
 		json: true
@@ -272,8 +271,6 @@ function bot_link(channel, msg, title, wiki) {
 			}
 			else {
 				console.log( '- Fehler beim Erhalten der Suchergebnisse' + ( error ? ': ' + error : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
-				console.log( response.request.uri );
-				console.log( wiki );
 				bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + ( title ? 'Special:Search/' + title.toTitle() : '' ) );
 			}
 		}
@@ -289,7 +286,7 @@ function bot_link(channel, msg, title, wiki) {
 					
 				if ( ( querypage.missing !== undefined && querypage.known === undefined ) || querypage.invalid !== undefined ) {
 					request( {
-						uri: wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=4|12|14|' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrsearch=' + encodeURI( title ) + '&gsrlimit=1&format=json',
+						uri: wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=4|12|14|' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrlimit=1&gsrsearch=' + encodeURI( title ) + '&format=json',
 						json: true
 					}, function( srerror, srresponse, srbody ) {
 						if ( srerror || !srresponse || srresponse.statusCode !== 200 || !srbody ) {
