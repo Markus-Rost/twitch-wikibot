@@ -285,27 +285,30 @@ function bot_link(channel, msg, title, wiki) {
 				}
 					
 				if ( ( querypage.missing !== undefined && querypage.known === undefined ) || querypage.invalid !== undefined ) {
-					request( {
-						uri: wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=4|12|14|' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrlimit=1&gsrsearch=' + encodeURIComponent( title ) + '&format=json',
-						json: true
-					}, function( srerror, srresponse, srbody ) {
-						if ( srerror || !srresponse || srresponse.statusCode !== 200 || !srbody ) {
-							console.log( '- Fehler beim Erhalten der Suchergebnisse' + ( srerror ? ': ' + srerror : ( srbody ? ( srbody.error ? ': ' + srbody.error.info : '.' ) : '.' ) ) );
-							bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search?search=' + encodeURIComponent( title ).replace( /%20/g, '+' ) );
-						}
-						else {
-							if ( !srbody.query ) {
-								bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
+					if ( /^https:\/\/[a-z\d-]{1,50}\.fandom\.com\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
+						request( {
+							uri: wiki + 'api/v1/Search/List?minArticleQuality=0&namespaces=4,12,14,' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=1&query=' + encodeURIComponent( title ) + '&format=json',
+							json: true
+						}, function( wserror, wsresponse, wsbody ) {
+							if ( wserror || !wsresponse || wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.items ) {
+								if ( wsbody.exception && wsbody.exception.code === 404 ) {
+									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
+								}
+								else {
+									console.log( '- Fehler beim Erhalten der Suchergebnisse' + ( wserror ? ': ' + wserror : ( wsbody ? ( srbody.exception ? ': ' + wsbody.exception.message : '.' ) : '.' ) ) );
+									bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search?search=' + encodeURIComponent( title ).replace( /%20/g, '+' ) );
+								}
 							}
 							else {
-								querypage = Object.values(srbody.query.pages)[0];
+								querypage = wsbody.items[0];
+								if ( querypage.ns && !querypage.title.startsWith(body.query.namespaces[querypage.ns]['*'] + ':') ) {
+									querypage.title = body.query.namespaces[querypage.ns]['*'] + ':' + querypage.title;
+								}
 								var text = wiki.toLink() + querypage.title.toTitle();
-								if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
-								else if ( querypage.extract ) text += ' – ' + querypage.extract;
 								if ( title.replace( /\-/g, ' ' ).toTitle().toLowerCase() === querypage.title.replace( /\-/g, ' ' ).toTitle().toLowerCase() ) {
 									text = text;
 								}
-								else if ( !srbody.continue ) {
+								else if ( wsbody.total === 1 ) {
 									text = 'I found only this: ' + text;
 								}
 								else {
@@ -313,8 +316,40 @@ function bot_link(channel, msg, title, wiki) {
 								}
 								bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
 							}
-						}
-					} );
+						} );
+					}
+					else {
+						request( {
+							uri: wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=4|12|14|' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrlimit=1&gsrsearch=' + encodeURIComponent( title ) + '&format=json',
+							json: true
+						}, function( srerror, srresponse, srbody ) {
+							if ( srerror || !srresponse || srresponse.statusCode !== 200 || !srbody ) {
+								console.log( '- Fehler beim Erhalten der Suchergebnisse' + ( srerror ? ': ' + srerror : ( srbody ? ( srbody.error ? ': ' + srbody.error.info : '.' ) : '.' ) ) );
+								bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search?search=' + encodeURIComponent( title ).replace( /%20/g, '+' ) );
+							}
+							else {
+								if ( !srbody.query ) {
+									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
+								}
+								else {
+									querypage = Object.values(srbody.query.pages)[0];
+									var text = wiki.toLink() + querypage.title.toTitle();
+									if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
+									else if ( querypage.extract ) text += ' – ' + querypage.extract;
+									if ( title.replace( /\-/g, ' ' ).toTitle().toLowerCase() === querypage.title.replace( /\-/g, ' ' ).toTitle().toLowerCase() ) {
+										text = text;
+									}
+									else if ( !srbody.continue ) {
+										text = 'I found only this: ' + text;
+									}
+									else {
+										text = 'I found this for you: ' + text;
+									}
+									bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+								}
+							}
+						} );
+					}
 				}
 				else {
 					var text = wiki.toLink() + querypage.title.toTitle() + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + body.query.redirects[0].tofragment.toSection() : '' );
