@@ -71,7 +71,7 @@ function getAllSites() {
 		}
 		else {
 			console.log( '- Wikis erfolgreich ausgelesen.' );
-			allSites = Object.assign([], body.data.wikis.filter( site => /^[a-z\d-]{1,50}\.gamepedia\.com$/.test(site.wiki_domain) ));
+			allSites = JSON.parse(JSON.stringify(body.data.wikis.filter( site => /^[a-z\d-]{1,50}\.gamepedia\.com$/.test(site.wiki_domain) )));
 		}
 	} );
 }
@@ -138,11 +138,11 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 			}
 		}
 		else {
-			bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
+			bot_link(channel, msg.split(' ').slice(1).join(' '), wiki);
 		}
 	}
 	else {
-		bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
+		bot_link(channel, msg.split(' ').slice(1).join(' '), wiki);
 	}
 }
 
@@ -157,7 +157,7 @@ async function bot_eval(channel, userstate, msg, args, wiki) {
 		if ( text.length > 450 ) bot.say( channel, 'MrDestructoid ✅' ).catch( err => bot.say( channel, err.name + ': ' + err.message ) );
 		else bot.say( channel, 'MrDestructoid ' + text ).catch( err => bot.say( channel, err.name + ': ' + err.message ) );
 	} else {
-		bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
+		bot_link(channel, msg.split(' ').slice(1).join(' '), wiki);
 	}
 }
 
@@ -208,7 +208,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 			} );
 		}
 	} else {
-		bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
+		bot_link(channel, msg.split(' ').slice(1).join(' '), wiki);
 	}
 }
 
@@ -254,13 +254,14 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 			}
 		} );
 	} else {
-		bot_link(channel, msg, msg.split(' ').slice(1).join(' '), wiki);
+		bot_link(channel, msg.split(' ').slice(1).join(' '), wiki);
 	}
 }
 
-function bot_link(channel, msg, title, wiki) {
+function bot_link(channel, title, wiki) {
 	if ( title.length > 300 ) title = title.substr(0, 300);
-	request( {
+	if ( title.toLowerCase() === 'random' ) bot_random(channel, wiki);
+	else request( {
 		uri: wiki + 'api.php?action=query&meta=siteinfo&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( title ) + '&format=json',
 		json: true
 	}, function( error, response, body ) {
@@ -364,7 +365,7 @@ function bot_link(channel, msg, title, wiki) {
 				var regex = inter.url.match( /^https:\/\/[a-z\d-]{1,50}\.(?:gamepedia\.com|fandom\.com(?:(?!\/wiki\/)\/[a-z-]{1,8})?(\/wiki))\// );
 				if ( regex !== null ) {
 					var iwtitle = decodeURIComponent( inter.url.replace( regex[0], '' ) ).replace( /\_/g, ' ' ).replaceSave( intertitle.replace( /\_/g, ' ' ), intertitle );
-					bot_link(channel, msg, iwtitle, regex[0].replace( regex[1], '' ));
+					bot_link(channel, iwtitle, regex[0].replace( regex[1], '' ));
 				} else bot.say( channel, inter.url );
 			}
 			else {
@@ -384,6 +385,31 @@ function bot_link(channel, msg, title, wiki) {
 					bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
 				} );
 			}
+		}
+	} );
+}
+
+function bot_random(channel, wiki) {
+	request( {
+		uri: wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=random&grnnamespace=0&format=json',
+		json: true
+	}, function( error, response, body ) {
+		if ( error || !response || response.statusCode !== 200 || !body || !body.query || !body.query.pages ) {
+			if ( response && response.request && response.request.uri && response.request.uri.href === wiki.noWiki() ) {
+				console.log( '- Dieses Wiki existiert nicht! ' + ( error ? error.message : ( body ? ( body.error ? body.error.info : '' ) : '' ) ) );
+				bot.say( channel, 'This wiki does not exist!' );
+			}
+			else {
+				console.log( '- Fehler beim Erhalten der Suchergebnisse' + ( error ? ': ' + error : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
+				bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Random' );
+			}
+		}
+		else {
+			var querypage = Object.values(body.query.pages)[0];
+			var text = '🎲 ' + wiki.toLink() + querypage.title.toTitle();
+			if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
+			else if ( querypage.extract ) text += ' – ' + querypage.extract;
+			bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
 		}
 	} );
 }
@@ -423,16 +449,16 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 		if ( args[0] ) {
 			var invoke = args[0].toLowerCase()
 			if ( invoke in cmds ) cmds[invoke](channel, userstate, msg, args.slice(1), wiki);
-			else if ( /^![a-z\d-]{1,50}$/.test(invoke) ) bot_link(channel, msg, args.slice(1).join(' '), 'https://' + invoke.substr(1) + '.gamepedia.com/');
+			else if ( /^![a-z\d-]{1,50}$/.test(invoke) ) bot_link(channel, args.slice(1).join(' '), 'https://' + invoke.substr(1) + '.gamepedia.com/');
 			else if ( /^\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
 				if ( invoke.includes( '.' ) ) wiki = 'https://' + invoke.split('.')[1] + '.fandom.com/' + invoke.substr(1).split('.')[0] + '/';
 				else wiki = 'https://' + invoke.substr(1) + '.fandom.com/';
-				bot_link(channel, msg, args.slice(1).join(' '), wiki);
+				bot_link(channel, args.slice(1).join(' '), wiki);
 			}
-			else bot_link(channel, msg, args.join(' '), wiki);
+			else bot_link(channel, args.join(' '), wiki);
 		}
 		else {
-			bot_link(channel, msg, args.join(' '), wiki);
+			bot_link(channel, args.join(' '), wiki);
 		}
 	}
 } );
