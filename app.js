@@ -292,7 +292,7 @@ function bot_link(channel, title, wiki) {
 							json: true
 						}, function( wserror, wsresponse, wsbody ) {
 							if ( wserror || !wsresponse || wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.items ) {
-								if ( wsbody.exception && wsbody.exception.code === 404 ) {
+								if ( wsbody && wsbody.exception && wsbody.exception.code === 404 ) {
 									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
 								}
 								else {
@@ -306,16 +306,31 @@ function bot_link(channel, title, wiki) {
 									querypage.title = body.query.namespaces[querypage.ns]['*'] + ':' + querypage.title;
 								}
 								var text = wiki.toLink() + querypage.title.toTitle();
-								if ( title.replace( /\-/g, ' ' ).toTitle().toLowerCase() === querypage.title.replace( /\-/g, ' ' ).toTitle().toLowerCase() ) {
-									text = text;
-								}
-								else if ( wsbody.total === 1 ) {
-									text = 'I found only this: ' + text;
-								}
-								else {
-									text = 'I found this for you: ' + text;
-								}
-								bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+								
+								request( {
+									uri: text
+								}, function( descerror, descresponse, descbody ) {
+									if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
+										console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
+									} else {
+										var match = descbody.match( /<meta property="og:description" content="(.*)" ?\/?>/ );
+										if ( match !== null ) {
+											text += ' – ' + match[1];
+										}
+									}
+									
+									if ( title.replace( /\-/g, ' ' ).toTitle().toLowerCase() === querypage.title.replace( /\-/g, ' ' ).toTitle().toLowerCase() ) {
+										text = text;
+									}
+									else if ( wsbody.total === 1 ) {
+										text = 'I found only this: ' + text;
+									}
+									else {
+										text = 'I found this for you: ' + text;
+									}
+									
+									bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+								} );
 							}
 						} );
 					}
@@ -356,7 +371,24 @@ function bot_link(channel, title, wiki) {
 					var text = wiki.toLink() + querypage.title.toTitle() + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + body.query.redirects[0].tofragment.toSection() : '' );
 					if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
 					else if ( querypage.extract ) text += ' – ' + querypage.extract;
-					bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+					else if ( /^https:\/\/[a-z\d-]{1,50}\.fandom\.com\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
+						var nosend = true;
+						request( {
+							uri: wiki.toLink() + querypage.title.toTitle()
+						}, function( descerror, descresponse, descbody ) {
+							if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
+								console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
+							} else {
+								var match = descbody.match( /<meta property="og:description" content="(.*)" ?\/?>/ );
+								if ( match !== null ) {
+									text += ' – ' + match[1];
+								}
+							}
+							bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+						} );
+					}
+					
+					if ( !nosend ) bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
 				}
 			}
 			else if ( body.query.interwiki ) {
@@ -371,18 +403,36 @@ function bot_link(channel, title, wiki) {
 			else {
 				var text = wiki.toLink() + body.query.general.mainpage.toTitle();
 				request( {
-					uri: wiki + 'api.php?action=query&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json',
+					uri: wiki + 'api.php?action=query&meta=allmessages&ammessages=description&amenableparser=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json',
 					json: true
 				}, function( mperror, mpresponse, mpbody ) {
 					if ( mperror || !mpresponse || mpresponse.statusCode !== 200 || !mpbody || !mpbody.query ) {
-						console.log( '- ' + ( mpresponse ? mpresponse.statusCode + ': ' : '' ) + 'Error while getting the main page' + ( error ? ': ' + error : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
+						console.log( '- ' + ( mpresponse ? mpresponse.statusCode + ': ' : '' ) + 'Error while getting the main page' + ( mperror ? ': ' + mperror : ( mpbody ? ( mpbody.error ? ': ' + mpbody.error.info : '.' ) : '.' ) ) );
 					} else {
 						querypage = Object.values(mpbody.query.pages)[0];
 						if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
 						else if ( querypage.extract ) text += ' – ' + querypage.extract;
+						else if ( mpbody.query.allmessages[0]['*'] ) text += ' – ' + mpbody.query.allmessages[0]['*'];
 					}
 					
-					bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+					if ( !text.includes( ' – ' ) && /^https:\/\/[a-z\d-]{1,50}\.fandom\.com\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
+						var nosend = true;
+						request( {
+							uri: text
+						}, function( descerror, descresponse, descbody ) {
+							if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
+								console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
+							} else {
+								var match = descbody.match( /<meta property="og:description" content="(.*)" ?\/?>/ );
+								if ( match !== null ) {
+									text += ' – ' + match[1];
+								}
+							}
+							bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+						} );
+					}
+					
+					if ( !nosend ) bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
 				} );
 			}
 		}
