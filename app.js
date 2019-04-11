@@ -95,7 +95,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 		var wikinew = '';
 		if ( allSites.some( site => site.wiki_domain === args[0] + '.gamepedia.com' ) ) wikinew = 'https://' + args[0] + '.gamepedia.com/';
 		else {
-			var regex = args[0].match( /^(?:https:\/\/)?([a-z\d-]{1,50}\.(?:gamepedia\.com|fandom\.com(?:(?!\/wiki\/)\/[a-z-]{1,8})?))(?:\/|$)/ );
+			var regex = args[0].match( /^(?:https:\/\/)?([a-z\d-]{1,50}\.(?:gamepedia\.com|(?:fandom\.com|wikia\.org)(?:(?!\/wiki\/)\/[a-z-]{1,8})?))(?:\/|$)/ );
 			if ( regex !== null ) wikinew = 'https://' + regex[1] + '/';
 			else if ( /^(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(args[0]) ) {
 				if ( args[0].includes( '.' ) ) wikinew = 'https://' + args[0].split('.')[1] + '.fandom.com/' + args[0].split('.')[0] + '/';
@@ -106,36 +106,51 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 			if ( wiki === wikinew ) {
 				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', the default wiki is already set to: ' + wiki );
 			}
-			else {
-				var temp_settings = Object.assign({}, botsettings);
-				temp_settings[channel] = wikinew;
-				request.post( {
-					uri: process.env.save,
-					headers: access,
-					body: {
-						branch: 'master',
-						commit_message: 'WikiBot: Settings updated.',
-						actions: [
-							{
-								action: 'update',
-								file_path: process.env.file,
-								content: JSON.stringify( temp_settings, null, '\t' )
-							}
-						]
-					},
-					json: true
-				}, function( error, response, body ) {
-					if ( error || !response || response.statusCode !== 201 || !body || body.error ) {
-						console.log( '- ' + ( response ? response.statusCode + ': ' : '' ) + 'Error while editing the settings' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
-						bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
+			else request( {
+				uri: wikinew + 'api.php?action=query&format=json',
+				json: true
+			}, function( error, response, body ) {
+				if ( error || !response || response.statusCode !== 200 || !body || !( body instanceof Object ) ) {
+					if ( response && response.request && response.request.uri && response.request.uri.href === wikinew.noWiki() ) {
+						console.log( '- This wiki doesn\'t exist! ' + ( error ? error.message : ( body ? ( body.error ? body.error.info : '' ) : '' ) ) );
+						bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
+						var nowiki = true;
+					} else {
+						console.log( '- ' + ( response ? response.statusCode + ': ' : '' ) + 'Error while reaching the wiki' + ( error ? ': ' + error : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
+						var comment = ' I got an error while checking if the wiki exists!';
 					}
-					else {
-						botsettings = Object.assign({}, temp_settings);
-						console.log( '- Settings successfully updated.' );
-						bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I changed the default wiki to: ' + botsettings[channel] );
-					}
-				} );
-			}
+				}
+				if ( !nowiki ) {
+					var temp_settings = Object.assign({}, botsettings);
+					temp_settings[channel] = wikinew;
+					request.post( {
+						uri: process.env.save,
+						headers: access,
+						body: {
+							branch: 'master',
+							commit_message: 'WikiBot: Settings updated.',
+							actions: [
+								{
+									action: 'update',
+									file_path: process.env.file,
+									content: JSON.stringify( temp_settings, null, '\t' )
+								}
+							]
+						},
+						json: true
+					}, function( serror, sresponse, sbody ) {
+						if ( serror || !sresponse || sresponse.statusCode !== 201 || !sbody || sbody.error ) {
+							console.log( '- ' + ( sresponse ? sresponse.statusCode + ': ' : '' ) + 'Error while editing the settings' + ( serror ? ': ' + serror.message : ( sbody ? ( sbody.message ? ': ' + sbody.message : ( sbody.error ? ': ' + sbody.error : '.' ) ) : '.' ) ) );
+							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
+						}
+						else {
+							botsettings = Object.assign({}, temp_settings);
+							console.log( '- Settings successfully updated.' );
+							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I changed the default wiki to: ' + botsettings[channel] + ( comment ? comment : '' ) );
+						}
+					} );
+				}
+			} );
 		}
 		else {
 			bot_link(channel, msg.split(' ').slice(1).join(' '), wiki);
@@ -259,7 +274,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 }
 
 function bot_link(channel, title, wiki) {
-	if ( title.length > 300 ) title = title.substr(0, 300);
+	if ( title.length > 300 ) title = title.substring(0, 300);
 	if ( title.toLowerCase() === 'random' ) bot_random(channel, wiki);
 	else request( {
 		uri: wiki + 'api.php?action=query&meta=siteinfo&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( title ) + '&format=json',
@@ -286,7 +301,7 @@ function bot_link(channel, title, wiki) {
 				}
 					
 				if ( ( querypage.missing !== undefined && querypage.known === undefined ) || querypage.invalid !== undefined ) {
-					if ( /^https:\/\/[a-z\d-]{1,50}\.fandom\.com\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
+					if ( /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
 						request( {
 							uri: wiki + 'api/v1/Search/List?minArticleQuality=0&namespaces=4,12,14,' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=1&query=' + encodeURIComponent( title ) + '&format=json',
 							json: true
@@ -296,7 +311,7 @@ function bot_link(channel, title, wiki) {
 									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
 								}
 								else {
-									console.log( '- ' + ( wsresponse ? wsresponse.statusCode + ': ' : '' ) + 'Error while getting the search results' + ( wserror ? ': ' + wserror : ( wsbody ? ( srbody.exception ? ': ' + wsbody.exception.message : '.' ) : '.' ) ) );
+									console.log( '- ' + ( wsresponse ? wsresponse.statusCode + ': ' : '' ) + 'Error while getting the search results' + ( wserror ? ': ' + wserror : ( wsbody ? ( wsbody.exception ? ': ' + wsbody.exception.message : '.' ) : '.' ) ) );
 									bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search?search=' + encodeURIComponent( title ).replace( /%20/g, '+' ) );
 								}
 							}
@@ -329,7 +344,7 @@ function bot_link(channel, title, wiki) {
 										text = 'I found this for you: ' + text;
 									}
 									
-									bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+									bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 								} );
 							}
 						} );
@@ -361,7 +376,7 @@ function bot_link(channel, title, wiki) {
 									else {
 										text = 'I found this for you: ' + text;
 									}
-									bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+									bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 								}
 							}
 						} );
@@ -371,7 +386,7 @@ function bot_link(channel, title, wiki) {
 					var text = wiki.toLink() + querypage.title.toTitle() + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + body.query.redirects[0].tofragment.toSection() : '' );
 					if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
 					else if ( querypage.extract ) text += ' – ' + querypage.extract;
-					else if ( /^https:\/\/[a-z\d-]{1,50}\.fandom\.com\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
+					else if ( /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
 						var nosend = true;
 						request( {
 							uri: wiki.toLink() + querypage.title.toTitle()
@@ -384,21 +399,27 @@ function bot_link(channel, title, wiki) {
 									text += ' – ' + match[1];
 								}
 							}
-							bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+							bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 						} );
 					}
 					
-					if ( !nosend ) bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+					if ( !nosend ) bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				}
 			}
 			else if ( body.query.interwiki ) {
 				var inter = body.query.interwiki[0];
-				var intertitle = inter.title.substr(inter.iw.length+1);
-				var regex = inter.url.match( /^https:\/\/[a-z\d-]{1,50}\.(?:gamepedia\.com|fandom\.com(?:(?!\/wiki\/)\/[a-z-]{1,8})?(\/wiki))\// );
+				var intertitle = inter.title.substring(inter.iw.length+1);
+				var regex = inter.url.match( /^(?:https?:)?\/\/([a-z\d-]{1,50}\.(?:gamepedia\.com|(?:fandom\.com|wikia\.org)(?:(?!\/wiki\/)\/[a-z-]{1,8})?(\/wiki))\/)/ );
 				if ( regex !== null ) {
 					var iwtitle = decodeURIComponent( inter.url.replace( regex[0], '' ) ).replace( /\_/g, ' ' ).replaceSave( intertitle.replace( /\_/g, ' ' ), intertitle );
-					bot_link(channel, iwtitle, regex[0].replace( regex[1], '' ));
-				} else bot.say( channel, inter.url );
+					bot_link(channel, iwtitle, 'https://' + regex[1].replace( regex[2], '' ));
+				} else {
+					regex = inter.url.match( /^(?:https?:)?\/\/([a-z\d-]{1,50}\.(?:wikipedia|mediawiki|wiktionary|wikimedia|wikibooks|wikisource|wikidata|wikiversity|wikiquote|wikinews|wikivoyage)\.org\/)wiki\// );
+					if ( regex !== null ) {
+						var iwtitle = decodeURIComponent( inter.url.replace( regex[0], '' ) ).replace( /\_/g, ' ' ).replaceSave( intertitle.replace( /\_/g, ' ' ), intertitle );
+						bot_link(channel, iwtitle, 'https://' + regex[1] + 'w/');
+					} else bot.say( channel, inter.url );
+				}
 			}
 			else {
 				var text = wiki.toLink() + body.query.general.mainpage.toTitle();
@@ -415,7 +436,7 @@ function bot_link(channel, title, wiki) {
 						else if ( mpbody.query.allmessages[0]['*'] ) text += ' – ' + mpbody.query.allmessages[0]['*'];
 					}
 					
-					if ( !text.includes( ' – ' ) && /^https:\/\/[a-z\d-]{1,50}\.fandom\.com\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
+					if ( !text.includes( ' – ' ) && /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
 						var nosend = true;
 						request( {
 							uri: text
@@ -428,11 +449,11 @@ function bot_link(channel, title, wiki) {
 									text += ' – ' + match[1];
 								}
 							}
-							bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+							bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 						} );
 					}
 					
-					if ( !nosend ) bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+					if ( !nosend ) bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				} );
 			}
 		}
@@ -459,18 +480,36 @@ function bot_random(channel, wiki) {
 			var text = '🎲 ' + wiki.toLink() + querypage.title.toTitle();
 			if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
 			else if ( querypage.extract ) text += ' – ' + querypage.extract;
-			bot.say( channel, ( text.length < 450 ? text : text.substr(0, 450) + '\u2026' ) );
+			else if ( /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
+				var nosend = true;
+				request( {
+					uri: wiki.toLink() + querypage.title.toTitle()
+				}, function( descerror, descresponse, descbody ) {
+					if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
+						console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
+					} else {
+						var match = descbody.match( /<meta property="og:description" content="(.*)" ?\/?>/ );
+						if ( match !== null ) {
+							text += ' – ' + match[1];
+						}
+					}
+					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+				} );
+			}
+			
+			if ( !nosend ) bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 		}
 	} );
 }
 
 String.prototype.noWiki = function() {
-	if ( /^https:\/\/[a-z\d-]{1,50}\.gamepedia\.com\/$/.test(this) ) return 'https://www.gamepedia.com/';
-	else return this.replace( /^https:\/\/([a-z\d-]{1,50}\.fandom\.com)\/(?:[a-z-]{1,8}\/)?$/, 'https://community.fandom.com/wiki/Community_Central:Not_a_valid_community?from=$1' );
+	if ( this.endsWith( '.gamepedia.com/' ) ) return 'https://www.gamepedia.com/';
+	else return this.replace( /^https:\/\/([a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org))\/(?:[a-z-]{1,8}\/)?$/, 'https://community.fandom.com/wiki/Community_Central:Not_a_valid_community?from=$1' );
 };
 
 String.prototype.toLink = function() {
-	if ( /^https:\/\/[a-z\d-]{1,50}\.gamepedia\.com\/$/.test(this) ) return this;
+	if ( this.endsWith( '.gamepedia.com/' ) ) return this;
+	else if ( this.endsWith( '.org/w/' ) && !this.endsWith( '.wikia.org/w/' ) ) return this.substring(0, this.length - 2) + 'wiki/';
 	else return this + 'wiki/';
 };
 
@@ -499,10 +538,15 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 		if ( args[0] ) {
 			var invoke = args[0].toLowerCase()
 			if ( invoke in cmds ) cmds[invoke](channel, userstate, msg, args.slice(1), wiki);
-			else if ( /^![a-z\d-]{1,50}$/.test(invoke) ) bot_link(channel, args.slice(1).join(' '), 'https://' + invoke.substr(1) + '.gamepedia.com/');
+			else if ( /^![a-z\d-]{1,50}$/.test(invoke) ) bot_link(channel, args.slice(1).join(' '), 'https://' + invoke.substring(1) + '.gamepedia.com/');
 			else if ( /^\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
-				if ( invoke.includes( '.' ) ) wiki = 'https://' + invoke.split('.')[1] + '.fandom.com/' + invoke.substr(1).split('.')[0] + '/';
-				else wiki = 'https://' + invoke.substr(1) + '.fandom.com/';
+				if ( invoke.includes( '.' ) ) wiki = 'https://' + invoke.split('.')[1] + '.fandom.com/' + invoke.substring(1).split('.')[0] + '/';
+				else wiki = 'https://' + invoke.substring(1) + '.fandom.com/';
+				bot_link(channel, args.slice(1).join(' '), wiki);
+			}
+			else if ( /^\?\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
+				if ( invoke.includes( '.' ) ) wiki = 'https://' + invoke.split('.')[1] + '.wikia.org/' + invoke.substring(2).split('.')[0] + '/';
+				else wiki = 'https://' + invoke.substring(2) + '.wikia.org/';
 				bot_link(channel, args.slice(1).join(' '), wiki);
 			}
 			else bot_link(channel, args.join(' '), wiki);
