@@ -52,8 +52,61 @@ function getSettings() {
 		else {
 			console.log( '- Settings successfully loaded.' );
 			botsettings = Object.assign({}, body);
-			for (var channel in botsettings) {
-				bot.join(channel).catch( error => console.log( channel + ': ' + error ) );
+			Object.keys(botsettings).forEach( channel => {
+				bot.join(channel).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( channel + ': ' + error ) ) );
+			} );
+			
+			var timeout = setTimeout( checkChannels, 10000 );
+		}
+	} );
+}
+
+function checkChannels() {
+	var channels = Object.keys(botsettings);
+	var streams = bot.getChannels();
+	console.log( '- Joined ' + streams.length + ' out of ' + channels.length + ' streams.' );
+	channels = channels.filter( channel => !streams.includes( channel ) );
+	if ( channels.length ) request( {
+		uri: 'https://api.twitch.tv/kraken/users?login=' + channels.join(',').replace( '#', '' ),
+		headers: kraken,
+		json: true
+	}, function( delerror, delresponse, delbody ) {
+		if ( delerror || !delresponse || delresponse.statusCode !== 200 || !delbody || delbody.error || !delbody.users ) {
+			console.log( '- ' + ( delresponse ? delresponse.statusCode + ': ' : '' ) + 'Error while checking missing streams' + ( delerror ? ': ' + delerror.message : ( delbody ? ( delbody.message ? ': ' + delbody.message : ( delbody.error ? ': ' + delbody.error : '.' ) ) : '.' ) ) );
+		}
+		else {
+			delbody.users.forEach( channel => {
+				bot.join(channel.name).catch( error => console.log( '#' + channel.name + ': ' + error ) );
+			} );
+			if ( delbody.users.length !== channels.length ) {
+				channels = channels.filter( channel => !delbody.users.some( user => '#' + user.name === channel ) );
+				var temp_settings = Object.assign({}, botsettings);
+				channels.forEach( channel => delete temp_settings[channel] );
+				request.post( {
+					uri: process.env.save,
+					headers: access,
+					body: {
+						branch: 'master',
+						commit_message: 'WikiBot: Settings removed.',
+						actions: [
+							{
+								action: 'update',
+								file_path: process.env.file,
+								content: JSON.stringify( temp_settings, null, '\t' )
+							}
+						]
+					},
+					json: true
+				}, function( error, response, body ) {
+					if ( error || !response || response.statusCode !== 201 || !body || body.error ) {
+						console.log( '- ' + ( response ? response.statusCode + ': ' : '' ) + 'Error while removing the settings' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
+					}
+					else {
+						botsettings = Object.assign({}, temp_settings);
+						console.log( '- I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
+						checkChannels();
+					}
+				} );
 			}
 		}
 	} );
@@ -211,12 +264,12 @@ function bot_join(channel, userstate, msg, args, wiki) {
 					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I joined your stream.' );
 					
 					request.put( {
-						url:'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'],
+						uri: 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'],
 						headers: kraken,
 						json: true
 					}, function( fwerror, fwresponse, fwbody ) {
-						if ( fwerror || !fwresponse || fwresponse.statusCode !== 200 || !fwbody ) {
-							console.log( '- ' + ( fwresponse ? fwresponse.statusCode + ': ' : '' ) + 'Error while following ' + userstate['display-name'] + ( fwerror ? ': ' + fwerror.message : '.' ) );
+						if ( fwerror || !fwresponse || fwresponse.statusCode !== 200 || !fwbody || fwbody.error ) {
+							console.log( '- ' + ( fwresponse ? fwresponse.statusCode + ': ' : '' ) + 'Error while following ' + userstate['display-name'] + ( fwerror ? ': ' + fwerror.message : ( fwbody ? ( fwbody.message ? ': ' + fwbody.message : ( fwbody.error ? ': ' + fwbody.error : '.' ) ) : '.' ) ) );
 						} else console.log( '- I\'m now following ' + userstate['display-name'] + '.' );
 					} );
 				}
@@ -258,12 +311,12 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 				bot.part('#' + userstate.username);
 				
 				request.delete( {
-					url:'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'],
+					uri: 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'],
 					headers: kraken,
 					json: true
 				}, function( fwerror, fwresponse, fwbody ) {
-					if ( fwerror || !fwresponse || fwresponse.statusCode !== 204 || fwbody ) {
-						console.log( '- ' + ( fwresponse ? fwresponse.statusCode + ': ' : '' ) + 'Error while unfollowing ' + userstate['display-name'] + ( fwerror ? ': ' + fwerror.message : '.' ) );
+					if ( fwerror || !fwresponse || fwresponse.statusCode !== 204 || !fwbody || fwbody.error ) {
+						console.log( '- ' + ( fwresponse ? fwresponse.statusCode + ': ' : '' ) + 'Error while unfollowing ' + userstate['display-name'] + ( fwerror ? ': ' + fwerror.message : ( fwbody ? ( fwbody.message ? ': ' + fwbody.message : ( fwbody.error ? ': ' + fwbody.error : '.' ) ) : '.' ) ) );
 					} else console.log( '- I\'m not following ' + userstate['display-name'] + ' anymore.' );
 				} );
 			}
