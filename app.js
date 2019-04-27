@@ -269,6 +269,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 						json: true
 					}, function( fwerror, fwresponse, fwbody ) {
 						if ( fwerror || !fwresponse || fwresponse.statusCode !== 200 || !fwbody || fwbody.error ) {
+							bot.whisper( '#Markus_Rost', 'Error while following ' + userstate['display-name'] );
 							console.log( '- ' + ( fwresponse ? fwresponse.statusCode + ': ' : '' ) + 'Error while following ' + userstate['display-name'] + ( fwerror ? ': ' + fwerror.message : ( fwbody ? ( fwbody.message ? ': ' + fwbody.message : ( fwbody.error ? ': ' + fwbody.error : '.' ) ) : '.' ) ) );
 						} else console.log( '- I\'m now following ' + userstate['display-name'] + '.' );
 					} );
@@ -316,6 +317,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 					json: true
 				}, function( fwerror, fwresponse, fwbody ) {
 					if ( fwerror || !fwresponse || fwresponse.statusCode !== 204 || !fwbody || fwbody.error ) {
+						bot.whisper( '#Markus_Rost', 'Error while unfollowing ' + userstate['display-name'] );
 						console.log( '- ' + ( fwresponse ? fwresponse.statusCode + ': ' : '' ) + 'Error while unfollowing ' + userstate['display-name'] + ( fwerror ? ': ' + fwerror.message : ( fwbody ? ( fwbody.message ? ': ' + fwbody.message : ( fwbody.error ? ': ' + fwbody.error : '.' ) ) : '.' ) ) );
 					} else console.log( '- I\'m not following ' + userstate['display-name'] + ' anymore.' );
 				} );
