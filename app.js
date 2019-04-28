@@ -103,6 +103,7 @@ function checkChannels() {
 					}
 					else {
 						botsettings = Object.assign({}, temp_settings);
+						bot.whisper( '#Markus_Rost', 'I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
 						console.log( '- I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
 						checkChannels();
 					}
