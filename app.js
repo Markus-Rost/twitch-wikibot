@@ -343,17 +343,23 @@ function bot_link(channel, title, wiki) {
 			}
 			else {
 				console.log( '- ' + ( response ? response.statusCode + ': ' : '' ) + 'Error while getting the search results' + ( error ? ': ' + error : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
-				bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + ( title ? 'Special:Search?search=' + encodeURIComponent( title ).replace( /%20/g, '+' ) : '' ) );
+				bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + ( title ? 'Special:Search?search=' + title.toSearch() : '' ) );
 			}
 		}
 		else {
 			if ( body.query.pages ) {
-				var querypage = Object.values(body.query.pages)[0];
+				var querypages = Object.values(body.query.pages);
+				var querypage = querypages[0];
 				if ( body.query.redirects && body.query.redirects[0].from.split(':')[0] === body.query.namespaces['-1']['*'] && body.query.specialpagealiases.filter( sp => ['Mypage','Mytalk','MyLanguage'].includes( sp.realname ) ).map( sp => sp.aliases[0] ).includes( body.query.redirects[0].from.split(':').slice(1).join(':').split('/')[0].replace( / /g, '_' ) ) ) {
 					querypage.title = body.query.redirects[0].from;
 					delete body.query.redirects[0].tofragment;
 					delete querypage.missing;
 					querypage.ns = -1;
+				}
+				if ( querypages.length !== 1 ) querypage = {
+					title: title,
+					invalidreason: 'The requested page title contains invalid characters: "|".',
+					invalid: ''
 				}
 					
 				if ( ( querypage.missing !== undefined && querypage.known === undefined ) || querypage.invalid !== undefined ) {
@@ -368,12 +374,12 @@ function bot_link(channel, title, wiki) {
 								}
 								else {
 									console.log( '- ' + ( wsresponse ? wsresponse.statusCode + ': ' : '' ) + 'Error while getting the search results' + ( wserror ? ': ' + wserror : ( wsbody ? ( wsbody.exception ? ': ' + wsbody.exception.message : '.' ) : '.' ) ) );
-									bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search?search=' + encodeURIComponent( title ).replace( /%20/g, '+' ) );
+									bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search?search=' + title.toSearch() );
 								}
 							}
 							else {
 								querypage = wsbody.items[0];
-								if ( querypage.ns && !querypage.title.startsWith(body.query.namespaces[querypage.ns]['*'] + ':') ) {
+								if ( querypage.ns && !querypage.title.startsWith( body.query.namespaces[querypage.ns]['*'] + ':' ) ) {
 									querypage.title = body.query.namespaces[querypage.ns]['*'] + ':' + querypage.title;
 								}
 								var text = wiki.toLink() + querypage.title.toTitle();
@@ -412,7 +418,7 @@ function bot_link(channel, title, wiki) {
 						}, function( srerror, srresponse, srbody ) {
 							if ( srerror || !srresponse || srresponse.statusCode !== 200 || !srbody ) {
 								console.log( '- ' + ( srresponse ? srresponse.statusCode + ': ' : '' ) + 'Error while getting the search results' + ( srerror ? ': ' + srerror : ( srbody ? ( srbody.error ? ': ' + srbody.error.info : '.' ) : '.' ) ) );
-								bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search?search=' + encodeURIComponent( title ).replace( /%20/g, '+' ) );
+								bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search?search=' + title.toSearch() );
 							}
 							else {
 								if ( !srbody.query ) {
@@ -571,6 +577,10 @@ String.prototype.toLink = function() {
 
 String.prototype.toTitle = function() {
 	return this.replace( / /g, '_' ).replace( /\%/g, '%25' ).replace( /\,/g, '%2C').replace( /\'/g, '%27' ).replace( /\!/g, '%21' ).replace( /\?/g, '%3F' );
+};
+
+String.prototype.toSearch = function() {
+	return encodeURIComponent( this ).replace( /%20/g, '+' );
 };
 
 String.prototype.toSection = function() {
