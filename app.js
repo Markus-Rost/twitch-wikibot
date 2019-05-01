@@ -4,6 +4,7 @@ util.inspect.defaultOptions = {compact:false,breakLength:Infinity};
 
 const TwitchJS = require('twitch-js');
 var request = require('request');
+var htmlparser = require('htmlparser2');
 
 var isDebug = ( process.argv[2] === 'debug' ? true : false );
 
@@ -390,10 +391,13 @@ function bot_link(channel, title, wiki) {
 									if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 										console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
 									} else {
-										var match = descbody.match( /<meta property="og:description" content="(.*)" ?\/?>/ );
-										if ( match !== null ) {
-											text += ' – ' + match[1];
-										}
+										var parser = new htmlparser.Parser( {
+											onopentag: (tagname, attribs) => {
+												if ( tagname === 'meta' && attribs.property === 'og:description' ) text += ' – ' + attribs.content;
+											}
+										}, {decodeEntities:true} );
+										parser.write( descbody );
+										parser.end();
 									}
 									
 									if ( title.replace( /\-/g, ' ' ).toTitle().toLowerCase() === querypage.title.replace( /\-/g, ' ' ).toTitle().toLowerCase() ) {
@@ -456,10 +460,13 @@ function bot_link(channel, title, wiki) {
 							if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 								console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
 							} else {
-								var match = descbody.match( /<meta property="og:description" content="(.*)" ?\/?>/ );
-								if ( match !== null ) {
-									text += ' – ' + match[1];
-								}
+								var parser = new htmlparser.Parser( {
+									onopentag: (tagname, attribs) => {
+										if ( tagname === 'meta' && attribs.property === 'og:description' ) text += ' – ' + attribs.content;
+									}
+								}, {decodeEntities:true} );
+								parser.write( descbody );
+								parser.end();
 							}
 							bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 						} );
@@ -506,10 +513,13 @@ function bot_link(channel, title, wiki) {
 							if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 								console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
 							} else {
-								var match = descbody.match( /<meta property="og:description" content="(.*)" ?\/?>/ );
-								if ( match !== null ) {
-									text += ' – ' + match[1];
-								}
+								var parser = new htmlparser.Parser( {
+									onopentag: (tagname, attribs) => {
+										if ( tagname === 'meta' && attribs.property === 'og:description' ) text += ' – ' + attribs.content;
+									}
+								}, {decodeEntities:true} );
+								parser.write( descbody );
+								parser.end();
 							}
 							bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 						} );
@@ -550,10 +560,13 @@ function bot_random(channel, wiki) {
 					if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 						console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
 					} else {
-						var match = descbody.match( /<meta property="og:description" content="(.*)" ?\/?>/ );
-						if ( match !== null ) {
-							text += ' – ' + match[1];
-						}
+						var parser = new htmlparser.Parser( {
+							onopentag: (tagname, attribs) => {
+								if ( tagname === 'meta' && attribs.property === 'og:description' ) text += ' – ' + attribs.content;
+							}
+						}, {decodeEntities:true} );
+						parser.write( descbody );
+						parser.end();
 					}
 					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				} );

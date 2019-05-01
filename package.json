@@ -11,7 +11,8 @@
   "license": "ISC",
   "dependencies": {
     "dotenv": "^6.2.0",
-    "npm": "^6.7.0",
+    "htmlparser2": "^3.10.1",
+    "npm": "^6.9.0",
     "request": "^2.88.0",
     "twitch-js": "^1.2.17"
   },
