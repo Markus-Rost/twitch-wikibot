@@ -334,7 +334,7 @@ function bot_link(channel, title, wiki) {
 	if ( title.length > 300 ) title = title.substring(0, 300);
 	if ( title.toLowerCase() === 'random' ) bot_random(channel, wiki);
 	else request( {
-		uri: wiki + 'api.php?action=query&meta=siteinfo&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( title ) + '&format=json',
+		uri: wiki + 'api.php?action=query&meta=allmessages|siteinfo&ammessages=description&amenableparser=true&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( title ) + '&format=json',
 		json: true
 	}, function( error, response, body ) {
 		if ( error || !response || response.statusCode !== 200 || !body || !body.query ) {
@@ -383,10 +383,23 @@ function bot_link(channel, title, wiki) {
 								if ( querypage.ns && !querypage.title.startsWith( body.query.namespaces[querypage.ns]['*'] + ':' ) ) {
 									querypage.title = body.query.namespaces[querypage.ns]['*'] + ':' + querypage.title;
 								}
-								var text = wiki.toLink() + querypage.title.toTitle();
-								
-								request( {
-									uri: text
+								var text = '';
+								if ( title.replace( /\-/g, ' ' ).toTitle().toLowerCase() === querypage.title.replace( /\-/g, ' ' ).toTitle().toLowerCase() ) {
+									text = '';
+								}
+								else if ( wsbody.total === 1 ) {
+									text = 'I found only this: ';
+								}
+								else {
+									text = 'I found this for you: ';
+								}
+								text += wiki.toLink() + querypage.title.toTitle();
+								if ( querypage.title === body.query.general.mainpage && body.query.allmessages[0]['*'] ) {
+										text += ' – ' + body.query.allmessages[0]['*'];
+										bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+								}
+								else request( {
+									uri: wiki.toLink() + querypage.title.toTitle()
 								}, function( descerror, descresponse, descbody ) {
 									if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 										console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
@@ -399,17 +412,6 @@ function bot_link(channel, title, wiki) {
 										parser.write( descbody );
 										parser.end();
 									}
-									
-									if ( title.replace( /\-/g, ' ' ).toTitle().toLowerCase() === querypage.title.replace( /\-/g, ' ' ).toTitle().toLowerCase() ) {
-										text = text;
-									}
-									else if ( wsbody.total === 1 ) {
-										text = 'I found only this: ' + text;
-									}
-									else {
-										text = 'I found this for you: ' + text;
-									}
-									
 									bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 								} );
 							}
@@ -430,18 +432,19 @@ function bot_link(channel, title, wiki) {
 								}
 								else {
 									querypage = Object.values(srbody.query.pages)[0];
-									var text = wiki.toLink() + querypage.title.toTitle();
-									if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
-									else if ( querypage.extract ) text += ' – ' + querypage.extract;
+									var text = '';
 									if ( title.replace( /\-/g, ' ' ).toTitle().toLowerCase() === querypage.title.replace( /\-/g, ' ' ).toTitle().toLowerCase() ) {
-										text = text;
+										text = '';
 									}
 									else if ( !srbody.continue ) {
-										text = 'I found only this: ' + text;
+										text = 'I found only this: ';
 									}
 									else {
-										text = 'I found this for you: ' + text;
+										text = 'I found this for you: ';
 									}
+									text += wiki.toLink() + querypage.title.toTitle();
+									if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
+									else if ( querypage.extract ) text += ' – ' + querypage.extract;
 									bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 								}
 							}
@@ -452,27 +455,26 @@ function bot_link(channel, title, wiki) {
 					var text = wiki.toLink() + querypage.title.toTitle() + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + body.query.redirects[0].tofragment.toSection() : '' );
 					if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
 					else if ( querypage.extract ) text += ' – ' + querypage.extract;
-					else if ( /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
-						var nosend = true;
-						request( {
-							uri: wiki.toLink() + querypage.title.toTitle()
-						}, function( descerror, descresponse, descbody ) {
-							if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
-								console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
-							} else {
-								var parser = new htmlparser.Parser( {
-									onopentag: (tagname, attribs) => {
-										if ( tagname === 'meta' && attribs.property === 'og:description' ) text += ' – ' + attribs.content;
-									}
-								}, {decodeEntities:true} );
-								parser.write( descbody );
-								parser.end();
-							}
-							bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
-						} );
+					else if ( querypage.title === body.query.general.mainpage && body.query.allmessages[0]['*'] ) {
+						text += ' – ' + body.query.allmessages[0]['*'];
 					}
-					
-					if ( !nosend ) bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+					if ( !text.includes( ' – ' ) && /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) request( {
+						uri: wiki.toLink() + querypage.title.toTitle()
+					}, function( descerror, descresponse, descbody ) {
+						if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
+							console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
+						} else {
+							var parser = new htmlparser.Parser( {
+								onopentag: (tagname, attribs) => {
+									if ( tagname === 'meta' && attribs.property === 'og:description' ) text += ' – ' + attribs.content;
+								}
+							}, {decodeEntities:true} );
+							parser.write( descbody );
+							parser.end();
+						}
+						bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+					} );
+					else bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				}
 			}
 			else if ( body.query.interwiki ) {
@@ -492,8 +494,28 @@ function bot_link(channel, title, wiki) {
 			}
 			else {
 				var text = wiki.toLink() + body.query.general.mainpage.toTitle();
-				request( {
-					uri: wiki + 'api.php?action=query&meta=allmessages&ammessages=description&amenableparser=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json',
+				if ( body.query.allmessages[0]['*'] ) {
+					text += ' – ' + body.query.allmessages[0]['*'];
+					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+				}
+				else if ( /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) request( {
+					uri: wiki.toLink() + body.query.general.mainpage.toTitle()
+				}, function( descerror, descresponse, descbody ) {
+					if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
+						console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
+					} else {
+						var parser = new htmlparser.Parser( {
+							onopentag: (tagname, attribs) => {
+								if ( tagname === 'meta' && attribs.property === 'og:description' ) text += ' – ' + attribs.content;
+							}
+						}, {decodeEntities:true} );
+						parser.write( descbody );
+						parser.end();
+					}
+					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+				} );
+				else request( {
+					uri: wiki + 'api.php?action=query&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json',
 					json: true
 				}, function( mperror, mpresponse, mpbody ) {
 					if ( mperror || !mpresponse || mpresponse.statusCode !== 200 || !mpbody || !mpbody.query ) {
@@ -502,30 +524,8 @@ function bot_link(channel, title, wiki) {
 						querypage = Object.values(mpbody.query.pages)[0];
 						if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
 						else if ( querypage.extract ) text += ' – ' + querypage.extract;
-						else if ( mpbody.query.allmessages[0]['*'] ) text += ' – ' + mpbody.query.allmessages[0]['*'];
 					}
-					
-					if ( !text.includes( ' – ' ) && /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
-						var nosend = true;
-						request( {
-							uri: text
-						}, function( descerror, descresponse, descbody ) {
-							if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
-								console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
-							} else {
-								var parser = new htmlparser.Parser( {
-									onopentag: (tagname, attribs) => {
-										if ( tagname === 'meta' && attribs.property === 'og:description' ) text += ' – ' + attribs.content;
-									}
-								}, {decodeEntities:true} );
-								parser.write( descbody );
-								parser.end();
-							}
-							bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
-						} );
-					}
-					
-					if ( !nosend ) bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				} );
 			}
 		}
