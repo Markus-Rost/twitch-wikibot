@@ -205,7 +205,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 						else {
 							botsettings = Object.assign({}, temp_settings);
 							console.log( '- Settings successfully updated.' );
-							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I changed the default wiki to: ' + botsettings[channel] + ( comment ? comment : '' ) );
+							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced ? 'forced' : 'changed' ) + ' the default wiki to: ' + botsettings[channel] + ( comment ? comment : '' ) );
 						}
 					} );
 				}
