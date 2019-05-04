@@ -148,7 +148,11 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 	if ( args[0] && ( userstate.mod || userstate['user-id'] === userstate['room-id'] || userstate['user-id'] === process.env.owner ) ) {
 		args[0] = args[0].toLowerCase();
 		var wikinew = '';
-		if ( allSites.some( site => site.wiki_domain === args[0] + '.gamepedia.com' ) ) wikinew = 'https://' + args[0] + '.gamepedia.com/';
+		if ( args[1] === '--force' ) {
+			var forced = true;
+			wikinew = args[0];
+		}
+		else if ( allSites.some( site => site.wiki_domain === args[0] + '.gamepedia.com' ) ) wikinew = 'https://' + args[0] + '.gamepedia.com/';
 		else {
 			var regex = args[0].match( /^(?:https:\/\/)?([a-z\d-]{1,50}\.(?:gamepedia\.com|(?:fandom\.com|wikia\.org)(?:(?!\/wiki\/)\/[a-z-]{1,8})?))(?:\/|$)/ );
 			if ( regex !== null ) wikinew = 'https://' + regex[1] + '/';
@@ -158,7 +162,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 			}
 		}
 		if ( wikinew ) {
-			if ( wiki === wikinew ) {
+			if ( wiki === wikinew && !forced ) {
 				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', the default wiki is already set to: ' + wiki );
 			}
 			else request( {
@@ -166,7 +170,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 				json: true
 			}, function( error, response, body ) {
 				if ( error || !response || response.statusCode !== 200 || !body || !( body instanceof Object ) ) {
-					if ( response && response.request && response.request.uri && response.request.uri.href === wikinew.noWiki() ) {
+					if ( forced || ( response && response.request && response.request.uri && response.request.uri.href === wikinew.noWiki() ) ) {
 						console.log( '- This wiki doesn\'t exist! ' + ( error ? error.message : ( body ? ( body.error ? body.error.info : '' ) : '' ) ) );
 						bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
 						var nowiki = true;
