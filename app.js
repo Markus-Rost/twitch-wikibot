@@ -447,7 +447,15 @@ function bot_link(channel, title, wiki) {
 										text = 'I found this for you: ';
 									}
 									text += wiki.toLink() + querypage.title.toTitle();
-									if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
+									if ( querypage.pageprops && querypage.pageprops.description ) {
+										var parser = new htmlparser.Parser( {
+											ontext: (htmltext) => {
+												text += htmltext;
+											}
+										}, {decodeEntities:true} );
+										parser.write( ' – ' + querypage.pageprops.description );
+										parser.end();
+									}
 									else if ( querypage.extract ) text += ' – ' + querypage.extract;
 									bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 								}
@@ -457,7 +465,15 @@ function bot_link(channel, title, wiki) {
 				}
 				else {
 					var text = wiki.toLink() + querypage.title.toTitle() + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + body.query.redirects[0].tofragment.toSection() : '' );
-					if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
+					if ( querypage.pageprops && querypage.pageprops.description ) {
+						var parser = new htmlparser.Parser( {
+							ontext: (htmltext) => {
+								text += htmltext;
+							}
+						}, {decodeEntities:true} );
+						parser.write( ' – ' + querypage.pageprops.description );
+						parser.end();
+					}
 					else if ( querypage.extract ) text += ' – ' + querypage.extract;
 					else if ( querypage.title === body.query.general.mainpage && body.query.allmessages[0]['*'] ) {
 						text += ' – ' + body.query.allmessages[0]['*'];
@@ -526,7 +542,15 @@ function bot_link(channel, title, wiki) {
 						console.log( '- ' + ( mpresponse ? mpresponse.statusCode + ': ' : '' ) + 'Error while getting the main page' + ( mperror ? ': ' + mperror : ( mpbody ? ( mpbody.error ? ': ' + mpbody.error.info : '.' ) : '.' ) ) );
 					} else {
 						querypage = Object.values(mpbody.query.pages)[0];
-						if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
+						if ( querypage.pageprops && querypage.pageprops.description ) {
+							var parser = new htmlparser.Parser( {
+								ontext: (htmltext) => {
+									text += htmltext;
+								}
+							}, {decodeEntities:true} );
+							parser.write( ' – ' + querypage.pageprops.description );
+							parser.end();
+						}
 						else if ( querypage.extract ) text += ' – ' + querypage.extract;
 					}
 					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
@@ -554,7 +578,15 @@ function bot_random(channel, wiki) {
 		else {
 			var querypage = Object.values(body.query.pages)[0];
 			var text = '🎲 ' + wiki.toLink() + querypage.title.toTitle();
-			if ( querypage.pageprops && querypage.pageprops.description ) text += ' – ' + querypage.pageprops.description;
+			if ( querypage.pageprops && querypage.pageprops.description ) {
+				var parser = new htmlparser.Parser( {
+					ontext: (htmltext) => {
+						text += htmltext;
+					}
+				}, {decodeEntities:true} );
+				parser.write( ' – ' + querypage.pageprops.description );
+				parser.end();
+			}
 			else if ( querypage.extract ) text += ' – ' + querypage.extract;
 			else if ( /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
 				var nosend = true;
