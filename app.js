@@ -403,7 +403,7 @@ function bot_link(channel, title, wiki) {
 										bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 								}
 								else request( {
-									uri: wiki.toLink() + querypage.title.toTitle()
+									uri: wiki.toLink() + encodeURIComponent( querypage.title.replace( / /g, '_' ) )
 								}, function( descerror, descresponse, descbody ) {
 									if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 										console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
@@ -479,7 +479,7 @@ function bot_link(channel, title, wiki) {
 						text += ' – ' + body.query.allmessages[0]['*'];
 					}
 					if ( !text.includes( ' – ' ) && /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) request( {
-						uri: wiki.toLink() + querypage.title.toTitle()
+						uri: wiki.toLink() + encodeURIComponent( querypage.title.replace( / /g, '_' ) )
 					}, function( descerror, descresponse, descbody ) {
 						if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 							console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
@@ -519,7 +519,7 @@ function bot_link(channel, title, wiki) {
 					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				}
 				else if ( /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) request( {
-					uri: wiki.toLink() + body.query.general.mainpage.toTitle()
+					uri: wiki.toLink() + encodeURIComponent( body.query.general.mainpage.replace( / /g, '_' ) )
 				}, function( descerror, descresponse, descbody ) {
 					if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 						console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
@@ -591,7 +591,7 @@ function bot_random(channel, wiki) {
 			else if ( /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
 				var nosend = true;
 				request( {
-					uri: wiki.toLink() + querypage.title.toTitle()
+					uri: wiki.toLink() + encodeURIComponent( querypage.title.replace( / /g, '_' ) )
 				}, function( descerror, descresponse, descbody ) {
 					if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 						console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
