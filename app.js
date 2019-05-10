@@ -182,6 +182,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 				if ( !nowiki ) {
 					var temp_settings = JSON.parse(JSON.stringify(botsettings));
 					temp_settings[channel].wiki = wikinew;
+					if ( !temp_settings[channel].id ) temp_settings[channel].id = userstate['room-id'];
 					request.post( {
 						uri: process.env.save,
 						headers: access,
@@ -242,7 +243,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 		}
 		else {
 			var temp_settings = JSON.parse(JSON.stringify(botsettings));
-			temp_settings['#' + userstate.username] = {wiki};
+			temp_settings['#' + userstate.username] = {id:userstate['user-id'],wiki};
 			request.post( {
 				uri: process.env.save,
 				headers: access,
