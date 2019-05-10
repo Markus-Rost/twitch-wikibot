@@ -53,8 +53,8 @@ function getSettings() {
 		else {
 			console.log( '- Settings successfully loaded.' );
 			botsettings = JSON.parse(JSON.stringify(body));
-			Object.keys(botsettings).forEach( channel => {
-				bot.join(channel).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( channel + ': ' + error ) ) );
+			Object.values(botsettings).forEach( channel => {
+				bot.join(channel.name).catch( error => if ( error !== 'No response from Twitch.' ) console.log( '#' + channel.name + ': ' + error ) );
 			} );
 			
 			var timeout = setTimeout( checkChannels, 10000 );
@@ -66,9 +66,9 @@ function checkChannels() {
 	var channels = Object.keys(botsettings);
 	var streams = bot.getChannels();
 	console.log( '- Joined ' + streams.length + ' out of ' + channels.length + ' streams.' );
-	channels = channels.filter( channel => !streams.includes( channel ) );
+	channels = channels.filter( channel => !streams.includes( '#' + botsettings[channel].name ) );
 	if ( channels.length ) request( {
-		uri: 'https://api.twitch.tv/kraken/users?login=' + channels.join(',').replace( '#', '' ),
+		uri: 'https://api.twitch.tv/kraken/users?id=' + channels.join(','),
 		headers: kraken,
 		json: true
 	}, function( delerror, delresponse, delbody ) {
@@ -76,11 +76,16 @@ function checkChannels() {
 			console.log( '- ' + ( delresponse ? delresponse.statusCode + ': ' : '' ) + 'Error while checking missing streams' + ( delerror ? ': ' + delerror.message : ( delbody ? ( delbody.message ? ': ' + delbody.message : ( delbody.error ? ': ' + delbody.error : '.' ) ) : '.' ) ) );
 		}
 		else {
+			var renamed = false;
 			delbody.users.forEach( channel => {
 				bot.join(channel.name).catch( error => console.log( '#' + channel.name + ': ' + error ) );
+				if ( botsettings[channel._id].name !== channel.name ) {
+					botsettings[channel._id].name = channel.name;
+					renamed = true;
+				}
 			} );
-			if ( delbody.users.length !== channels.length ) {
-				channels = channels.filter( channel => !delbody.users.some( user => '#' + user.name === channel ) );
+			if ( renamed || delbody.users.length !== channels.length ) {
+				channels = channels.filter( channel => !delbody.users.some( user => user._id === channel ) );
 				var temp_settings = JSON.parse(JSON.stringify(botsettings));
 				channels.forEach( channel => delete temp_settings[channel] );
 				request.post( {
@@ -88,7 +93,7 @@ function checkChannels() {
 					headers: access,
 					body: {
 						branch: 'master',
-						commit_message: 'WikiBot: Settings removed.',
+						commit_message: 'WikiBot: Settings updated or removed.',
 						actions: [
 							{
 								action: 'update',
@@ -104,8 +109,11 @@ function checkChannels() {
 					}
 					else {
 						botsettings = JSON.parse(JSON.stringify(temp_settings));
-						bot.whisper( '#Markus_Rost', 'I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
-						console.log( '- I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
+						console.log( '- I updated streams, that got renamed.' );
+						if ( channels.length ) {
+							bot.whisper( 'markus_rost', 'I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
+							console.log( '- I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
+						} else console.log( '- I updated streams, that got renamed.' );
 						checkChannels();
 					}
 				} );
@@ -181,8 +189,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 				}
 				if ( !nowiki ) {
 					var temp_settings = JSON.parse(JSON.stringify(botsettings));
-					temp_settings[channel].wiki = wikinew;
-					if ( !temp_settings[channel].id ) temp_settings[channel].id = userstate['room-id'];
+					temp_settings[userstate['room-id']].wiki = wikinew;
 					request.post( {
 						uri: process.env.save,
 						headers: access,
@@ -238,12 +245,12 @@ async function bot_eval(channel, userstate, msg, args, wiki) {
 
 function bot_join(channel, userstate, msg, args, wiki) {
 	if ( args[0] && args[0].toLowerCase() === '@' + userstate.username ) {
-		if ( '#' + userstate.username in botsettings ) {
+		if ( userstate['user-id'] in botsettings ) {
 			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I already joined your stream.' );
 		}
 		else {
 			var temp_settings = JSON.parse(JSON.stringify(botsettings));
-			temp_settings['#' + userstate.username] = {id:userstate['user-id'],wiki};
+			temp_settings[userstate['user-id']] = {wiki,name:userstate.username};
 			request.post( {
 				uri: process.env.save,
 				headers: access,
@@ -267,7 +274,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 				else {
 					botsettings = JSON.parse(JSON.stringify(temp_settings));
 					console.log( '- I\'ve been added to a stream.' );
-					bot.join('#' + userstate.username);
+					bot.join(userstate.username);
 					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I joined your stream.' );
 					
 					request.put( {
@@ -276,7 +283,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 						json: true
 					}, function( fwerror, fwresponse, fwbody ) {
 						if ( fwerror || !fwresponse || fwresponse.statusCode !== 200 || !fwbody || fwbody.error ) {
-							bot.whisper( '#Markus_Rost', 'Error while following ' + userstate['display-name'] );
+							bot.whisper( 'markus_rost', 'Error while following ' + userstate['display-name'] );
 							console.log( '- ' + ( fwresponse ? fwresponse.statusCode + ': ' : '' ) + 'Error while following ' + userstate['display-name'] + ( fwerror ? ': ' + fwerror.message : ( fwbody ? ( fwbody.message ? ': ' + fwbody.message : ( fwbody.error ? ': ' + fwbody.error : '.' ) ) : '.' ) ) );
 						} else console.log( '- I\'m now following ' + userstate['display-name'] + '.' );
 					} );
@@ -291,7 +298,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 function bot_leave(channel, userstate, msg, args, wiki) {
 	if ( userstate['user-id'] === userstate['room-id'] && args[0] && args[0].toLowerCase() === '@' + userstate.username ) {
 		var temp_settings = JSON.parse(JSON.stringify(botsettings));
-		delete temp_settings['#' + userstate.username];
+		delete temp_settings[userstate['room-id']];
 		request.post( {
 			uri: process.env.save,
 			headers: access,
@@ -316,7 +323,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 				botsettings = JSON.parse(JSON.stringify(temp_settings));
 				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I will leave your stream now.' );
 				console.log( '- I\'ve been removed from a stream.' );
-				bot.part('#' + userstate.username);
+				bot.part(userstate.username);
 				
 				request.delete( {
 					uri: 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'],
@@ -324,7 +331,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 					json: true
 				}, function( fwerror, fwresponse, fwbody ) {
 					if ( fwerror || !fwresponse || fwresponse.statusCode !== 204 || !fwbody || fwbody.error ) {
-						bot.whisper( '#Markus_Rost', 'Error while unfollowing ' + userstate['display-name'] );
+						bot.whisper( 'markus_rost', 'Error while unfollowing ' + userstate['display-name'] );
 						console.log( '- ' + ( fwresponse ? fwresponse.statusCode + ': ' : '' ) + 'Error while unfollowing ' + userstate['display-name'] + ( fwerror ? ': ' + fwerror.message : ( fwbody ? ( fwbody.message ? ': ' + fwbody.message : ( fwbody.error ? ': ' + fwbody.error : '.' ) ) : '.' ) ) );
 					} else console.log( '- I\'m not following ' + userstate['display-name'] + ' anymore.' );
 				} );
@@ -649,7 +656,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 	if ( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix ) {
 		if ( !allSites.length ) getAllSites();
 		console.log( channel + ': ' + msg );
-		var wiki = botsettings[channel].wiki;
+		var wiki = botsettings[userstate['room-id']].wiki;
 		var args = msg.split(' ').slice(1);
 		if ( args[0] ) {
 			var invoke = args[0].toLowerCase()
