@@ -103,7 +103,7 @@ function checkChannels() {
 						console.log( '- ' + ( response ? response.statusCode + ': ' : '' ) + 'Error while removing the settings' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
 					}
 					else {
-						botsettings = JSON.parse(JSON.stringify(temp_botsettings));
+						botsettings = JSON.parse(JSON.stringify(temp_settings));
 						bot.whisper( '#Markus_Rost', 'I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
 						console.log( '- I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
 						checkChannels();
@@ -203,7 +203,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
 						}
 						else {
-							botsettings = JSON.parse(JSON.stringify(temp_botsettings));
+							botsettings = JSON.parse(JSON.stringify(temp_settings));
 							console.log( '- Settings successfully updated.' );
 							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced ? 'forced' : 'changed' ) + ' the default wiki to: ' + botsettings[channel].wiki + ( comment ? comment : '' ) );
 						}
@@ -264,7 +264,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t join your stream :(' );
 				}
 				else {
-					botsettings = JSON.parse(JSON.stringify(temp_botsettings));
+					botsettings = JSON.parse(JSON.stringify(temp_settings));
 					console.log( '- I\'ve been added to a stream.' );
 					bot.join('#' + userstate.username);
 					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I joined your stream.' );
@@ -312,7 +312,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t leave your stream :(' );
 			}
 			else {
-				botsettings = JSON.parse(JSON.stringify(temp_botsettings));
+				botsettings = JSON.parse(JSON.stringify(temp_settings));
 				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I will leave your stream now.' );
 				console.log( '- I\'ve been removed from a stream.' );
 				bot.part('#' + userstate.username);
