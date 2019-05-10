@@ -213,7 +213,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 						else {
 							botsettings = JSON.parse(JSON.stringify(temp_settings));
 							console.log( '- Settings successfully updated.' );
-							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced ? 'forced' : 'changed' ) + ' the default wiki to: ' + botsettings[channel].wiki + ( comment ? comment : '' ) );
+							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced ? 'forced' : 'changed' ) + ' the default wiki to: ' + botsettings[userstate['room-id']].wiki + ( comment ? comment : '' ) );
 						}
 					} );
 				}
