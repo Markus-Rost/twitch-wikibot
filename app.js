@@ -54,7 +54,7 @@ function getSettings() {
 			console.log( '- Settings successfully loaded.' );
 			botsettings = JSON.parse(JSON.stringify(body));
 			Object.values(botsettings).forEach( channel => {
-				bot.join(channel.name).catch( error => if ( error !== 'No response from Twitch.' ) console.log( '#' + channel.name + ': ' + error ) );
+				bot.join(channel.name).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( '#' + channel.name + ': ' + error ) ) );
 			} );
 			
 			var timeout = setTimeout( checkChannels, 10000 );
