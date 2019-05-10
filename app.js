@@ -52,7 +52,7 @@ function getSettings() {
 		}
 		else {
 			console.log( '- Settings successfully loaded.' );
-			botsettings = Object.assign({}, body);
+			botsettings = JSON.parse(JSON.stringify(body));
 			Object.keys(botsettings).forEach( channel => {
 				bot.join(channel).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( channel + ': ' + error ) ) );
 			} );
@@ -81,7 +81,7 @@ function checkChannels() {
 			} );
 			if ( delbody.users.length !== channels.length ) {
 				channels = channels.filter( channel => !delbody.users.some( user => '#' + user.name === channel ) );
-				var temp_settings = Object.assign({}, botsettings);
+				var temp_settings = JSON.parse(JSON.stringify(botsettings));
 				channels.forEach( channel => delete temp_settings[channel] );
 				request.post( {
 					uri: process.env.save,
@@ -103,7 +103,7 @@ function checkChannels() {
 						console.log( '- ' + ( response ? response.statusCode + ': ' : '' ) + 'Error while removing the settings' + ( error ? ': ' + error.message : ( body ? ( body.message ? ': ' + body.message : ( body.error ? ': ' + body.error : '.' ) ) : '.' ) ) );
 					}
 					else {
-						botsettings = Object.assign({}, temp_settings);
+						botsettings = JSON.parse(JSON.stringify(temp_botsettings));
 						bot.whisper( '#Markus_Rost', 'I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
 						console.log( '- I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
 						checkChannels();
@@ -180,8 +180,8 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 					}
 				}
 				if ( !nowiki ) {
-					var temp_settings = Object.assign({}, botsettings);
-					temp_settings[channel] = wikinew;
+					var temp_settings = JSON.parse(JSON.stringify(botsettings));
+					temp_settings[channel].wiki = wikinew;
 					request.post( {
 						uri: process.env.save,
 						headers: access,
@@ -203,9 +203,9 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
 						}
 						else {
-							botsettings = Object.assign({}, temp_settings);
+							botsettings = JSON.parse(JSON.stringify(temp_botsettings));
 							console.log( '- Settings successfully updated.' );
-							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced ? 'forced' : 'changed' ) + ' the default wiki to: ' + botsettings[channel] + ( comment ? comment : '' ) );
+							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced ? 'forced' : 'changed' ) + ' the default wiki to: ' + botsettings[channel].wiki + ( comment ? comment : '' ) );
 						}
 					} );
 				}
@@ -241,8 +241,8 @@ function bot_join(channel, userstate, msg, args, wiki) {
 			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I already joined your stream.' );
 		}
 		else {
-			var temp_settings = Object.assign({}, botsettings);
-			temp_settings['#' + userstate.username] = wiki;
+			var temp_settings = JSON.parse(JSON.stringify(botsettings));
+			temp_settings['#' + userstate.username] = {wiki};
 			request.post( {
 				uri: process.env.save,
 				headers: access,
@@ -264,7 +264,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t join your stream :(' );
 				}
 				else {
-					botsettings = Object.assign({}, temp_settings);
+					botsettings = JSON.parse(JSON.stringify(temp_botsettings));
 					console.log( '- I\'ve been added to a stream.' );
 					bot.join('#' + userstate.username);
 					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I joined your stream.' );
@@ -289,7 +289,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 
 function bot_leave(channel, userstate, msg, args, wiki) {
 	if ( userstate['user-id'] === userstate['room-id'] && args[0] && args[0].toLowerCase() === '@' + userstate.username ) {
-		var temp_settings = Object.assign({}, botsettings);
+		var temp_settings = JSON.parse(JSON.stringify(botsettings));
 		delete temp_settings['#' + userstate.username];
 		request.post( {
 			uri: process.env.save,
@@ -312,7 +312,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t leave your stream :(' );
 			}
 			else {
-				botsettings = Object.assign({}, temp_settings);
+				botsettings = JSON.parse(JSON.stringify(temp_botsettings));
 				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I will leave your stream now.' );
 				console.log( '- I\'ve been removed from a stream.' );
 				bot.part('#' + userstate.username);
@@ -648,7 +648,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 	if ( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix ) {
 		if ( !allSites.length ) getAllSites();
 		console.log( channel + ': ' + msg );
-		var wiki = botsettings[channel];
+		var wiki = botsettings[channel].wiki;
 		var args = msg.split(' ').slice(1);
 		if ( args[0] ) {
 			var invoke = args[0].toLowerCase()
