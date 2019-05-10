@@ -330,7 +330,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 					headers: kraken,
 					json: true
 				}, function( fwerror, fwresponse, fwbody ) {
-					if ( fwerror || !fwresponse || fwresponse.statusCode !== 204 || fwbody || fwbody.error ) {
+					if ( fwerror || !fwresponse || fwresponse.statusCode !== 204 || fwbody ) {
 						bot.whisper( 'markus_rost', 'Error while unfollowing ' + userstate['display-name'] );
 						console.log( '- ' + ( fwresponse ? fwresponse.statusCode + ': ' : '' ) + 'Error while unfollowing ' + userstate['display-name'] + ( fwerror ? ': ' + fwerror.message : ( fwbody ? ( fwbody.message ? ': ' + fwbody.message : ( fwbody.error ? ': ' + fwbody.error : '.' ) ) : '.' ) ) );
 					} else console.log( '- I\'m not following ' + userstate['display-name'] + ' anymore.' );
