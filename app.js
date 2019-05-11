@@ -745,7 +745,7 @@ function checkGames(channels, mention) {
 							call++;
 							saveCheckedGames(temp_settings, updated, call, mention);
 						} else {
-							var wiki = allSites.find( site => site.wiki_display_name.endsWith( ' (EN)' ) && site.wiki_name.includes( channel.game ) );
+							var wiki = allSites.find( site => site.wiki_display_name.endsWith( ' (EN)' ) && site.wiki_display_name.includes( channel.game ) );
 							if ( wiki ) {
 								temp_settings[channel._id].wiki = 'https://' + wiki.wiki_domain + '/';
 								call++;
