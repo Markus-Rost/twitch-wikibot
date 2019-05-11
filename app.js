@@ -769,22 +769,31 @@ function checkGames(channels, mention) {
 										call++;
 										saveCheckedGames(temp_settings, updated, call, mention);
 									}
-									else if ( / \d\d?$/.test(channel.game) ) request( {
-										uri: 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( channel.game.replace( / \d\d?$/, '' ) ) + '&format=json',
-										json: true
-									}, function( ws2error, ws2response, ws2body ) {
-										if ( ws2error || !ws2response || ws2response.statusCode !== 200 || !ws2body || ws2body.exception || !ws2body.items ) {
-											console.log( '- ' + ( ws2response ? ws2response.statusCode + ': ' : '' ) + 'Error while getting the wiki results' + ( ws2error ? ': ' + ws2error : ( ws2body ? ( ws2body.exception ? ': ' + ws2body.exception.details : '.' ) : '.' ) ) );
-											channel.text = 'I got an error while searching for a wiki, I kept the default wiki to: ';
+									else if ( / (?:\d{1,2}|[IV]{1,3})$/.test(channel.game) ) {
+										channel.game = channel.game.replace( / (?:\d{1,2}|[IV]{1,3})$/, '' );
+										wiki = allSites.find( site => site.wiki_display_name.includes( channel.game ) && site.wiki_display_name.endsWith( ' (EN)' ) && site.ss_good_articles >= 100 );
+										if ( wiki ) {
+											temp_settings[channel._id].wiki = 'https://' + wiki.wiki_domain + '/';
+											call++;
+											saveCheckedGames(temp_settings, updated, call, mention);
 										}
-										else {
-											wiki = ws2body.items.find( site => site.stats.articles >= 100 );
-											if ( wiki ) temp_settings[channel._id].wiki = wiki.url + '/';
-											else channel.text = 'I couldn\'t find a wiki for this game, I kept the default wiki to: ';
-										}
-										call++;
-										saveCheckedGames(temp_settings, updated, call, mention);
-									} );
+										else request( {
+											uri: 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( channel.game.replace( / (?:\d{1,2}|[IV]{1,3})$/, '' ) ) + '&format=json',
+											json: true
+										}, function( ws2error, ws2response, ws2body ) {
+											if ( ws2error || !ws2response || ws2response.statusCode !== 200 || !ws2body || ws2body.exception || !ws2body.items ) {
+												console.log( '- ' + ( ws2response ? ws2response.statusCode + ': ' : '' ) + 'Error while getting the wiki results' + ( ws2error ? ': ' + ws2error : ( ws2body ? ( ws2body.exception ? ': ' + ws2body.exception.details : '.' ) : '.' ) ) );
+												channel.text = 'I got an error while searching for a wiki, I kept the default wiki to: ';
+											}
+											else {
+												wiki = ws2body.items.find( site => site.stats.articles >= 100 );
+												if ( wiki ) temp_settings[channel._id].wiki = wiki.url + '/';
+												else channel.text = 'I couldn\'t find a wiki for this game, I kept the default wiki to: ';
+											}
+											call++;
+											saveCheckedGames(temp_settings, updated, call, mention);
+										} );
+									}
 									else {
 										channel.text = 'I couldn\'t find a wiki for this game, I kept the default wiki to: ';
 										call++;
