@@ -740,6 +740,7 @@ function checkGames(channels, mention) {
 				updated.forEach( channel => {
 					temp_settings[channel._id].game = channel.game;
 					if ( channel.game ) {
+						channel.text = 'I automatically changed the default wiki to: ';
 						if ( allSites.some( site => site.wiki_domain === channel.game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' && site.ss_good_articles >= 100 ) ) {
 							temp_settings[channel._id].wiki = 'https://' + channel.game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com/';
 							call++;
@@ -757,17 +758,44 @@ function checkGames(channels, mention) {
 							}, function( wserror, wsresponse, wsbody ) {
 								if ( wserror || !wsresponse || wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.items ) {
 									console.log( '- ' + ( wsresponse ? wsresponse.statusCode + ': ' : '' ) + 'Error while getting the wiki results' + ( wserror ? ': ' + wserror : ( wsbody ? ( wsbody.exception ? ': ' + wsbody.exception.details : '.' ) : '.' ) ) );
+									channel.text = 'I got an error while searching for a wiki, I kept the default wiki to: ';
+									call++;
+									saveCheckedGames(temp_settings, updated, call, mention);
 								}
 								else {
 									wiki = wsbody.items.find( site => site.stats.articles >= 100 );
-									if ( wiki ) temp_settings[channel._id].wiki = wiki.url + '/';
+									if ( wiki ) {
+										temp_settings[channel._id].wiki = wiki.url + '/';
+										call++;
+										saveCheckedGames(temp_settings, updated, call, mention);
+									}
+									else if ( / \d\d?$/.test(channel.game) ) request( {
+										uri: 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( channel.game.replace( / \d\d?$/, '' ) ) + '&format=json',
+										json: true
+									}, function( ws2error, ws2response, ws2body ) {
+										if ( ws2error || !ws2response || ws2response.statusCode !== 200 || !ws2body || ws2body.exception || !ws2body.items ) {
+											console.log( '- ' + ( ws2response ? ws2response.statusCode + ': ' : '' ) + 'Error while getting the wiki results' + ( ws2error ? ': ' + ws2error : ( ws2body ? ( ws2body.exception ? ': ' + ws2body.exception.details : '.' ) : '.' ) ) );
+											channel.text = 'I got an error while searching for a wiki, I kept the default wiki to: ';
+										}
+										else {
+											wiki = ws2body.items.find( site => site.stats.articles >= 100 );
+											if ( wiki ) temp_settings[channel._id].wiki = wiki.url + '/';
+											else channel.text = 'I couldn\'t find a wiki for this game, I kept the default wiki to: ';
+										}
+										call++;
+										saveCheckedGames(temp_settings, updated, call, mention);
+									} );
+									else {
+										channel.text = 'I couldn\'t find a wiki for this game, I kept the default wiki to: ';
+										call++;
+										saveCheckedGames(temp_settings, updated, call, mention);
+									}
 								}
-								call++;
-								saveCheckedGames(temp_settings, updated, call, mention);
 							} );
 						}
 					}
 					else {
+						channel.text = 'No game is set, I kept the default wiki to: ';
 						call++;
 						saveCheckedGames(temp_settings, updated, call, mention);
 					}
@@ -802,7 +830,7 @@ function saveCheckedGames(temp_settings, updated, call, mention) {
 			botsettings = JSON.parse(JSON.stringify(temp_settings));
 			console.log( '- Games successfully updated.' );
 			updated.forEach( channel => {
-				bot.say( channel.name, 'gamepediaWIKIBOT ' + ( mention ? '@' + mention[1] + ', ' : '' ) + 'I automatically changed the default wiki to: ' + botsettings[channel._id].wiki );
+				bot.say( channel.name, 'gamepediaWIKIBOT ' + ( mention ? '@' + mention[1] + ', ' : '' ) + channel.text + botsettings[channel._id].wiki );
 			} );
 		}
 	} );
