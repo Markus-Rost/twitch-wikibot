@@ -740,12 +740,12 @@ function checkGames(channels, mention) {
 				updated.forEach( channel => {
 					temp_settings[channel._id].game = channel.game;
 					if ( channel.game ) {
-						if ( allSites.some( site => site.wiki_domain === channel.game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' ) ) {
+						if ( allSites.some( site => site.wiki_domain === channel.game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' && site.ss_good_articles >= 100 ) ) {
 							temp_settings[channel._id].wiki = 'https://' + channel.game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com/';
 							call++;
 							saveCheckedGames(temp_settings, updated, call, mention);
 						} else {
-							var wiki = allSites.find( site => site.wiki_display_name.endsWith( ' (EN)' ) && site.wiki_display_name.includes( channel.game ) );
+							var wiki = allSites.find( site => site.wiki_display_name.includes( channel.game ) && site.wiki_display_name.endsWith( ' (EN)' ) && site.ss_good_articles >= 100 );
 							if ( wiki ) {
 								temp_settings[channel._id].wiki = 'https://' + wiki.wiki_domain + '/';
 								call++;
