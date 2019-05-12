@@ -190,7 +190,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 		else {
 			args[0] = args[0].toLowerCase();
 			var wikinew = '';
-			if ( args[1] === '--force' ) {
+			if ( args.length === 2 && args[1] === '--force' ) {
 				var forced = true;
 				wikinew = args[0];
 			}
@@ -837,7 +837,7 @@ function saveCheckedGames(temp_settings, updated, call, mention) {
 		}
 		else {
 			botsettings = JSON.parse(JSON.stringify(temp_settings));
-			console.log( '- Games successfully updated.' );
+			console.log( '- Games successfully updated: ' + updated.map( channel => '#' + channel.name ).join(', ') );
 			updated.forEach( channel => {
 				bot.say( channel.name, 'gamepediaWIKIBOT ' + ( mention ? '@' + mention[1] + ', ' : '' ) + channel.text + botsettings[channel._id].wiki );
 			} );

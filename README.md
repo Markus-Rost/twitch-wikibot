@@ -9,16 +9,25 @@ Twitch channel: [https://www.twitch.tv/WikiBot](https://www.twitch.tv/WikiBot)
 
 # Commands
 ### `!wiki <search term>`
-**WikiBot** will answer with a link to a matching article in the default Wiki.
+**WikiBot** will answer with a link to a matching article in the default wiki.
 
 ### `!wiki !<wiki> <search term>`
 **WikiBot** will answer with a link to a matching article in the named Gamepedia wiki: `https://<wiki>.gamepedia.com/`
 
 ### `!wiki ?<wiki> <search term>`
-**WikiBot** will answer with a link to a matching article in the named Fandom wiki: `https://<wiki>.wikia.com/`
+**WikiBot** will answer with a link to a matching article in the named Fandom wiki: `https://<wiki>.fandom.com/`
+
+### `!wiki ??<wiki> <search term>`
+**WikiBot** will answer with a link to a matching article in the named Wikia wiki: `https://<wiki>.wikia.org/`
 
 ### `!wiki setwiki <link>`
 **WikiBot** will change the default wiki for the stream.
+<br>*Streamer and mods only*
+
+### `!wiki setwiki --auto`
+**WikiBot** will automatically change the default wiki for the stream whenever the game is updated.
+<br>An automatically set wiki can be overwritten by `!wiki setwiki <link>`.
+<br>Use the command again to toggle the feature.
 <br>*Streamer and mods only*
 
 ### `!wiki join @<your name>`
