@@ -216,7 +216,8 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 							console.log( '- This wiki doesn\'t exist! ' + ( error ? error.message : ( body ? ( body.error ? body.error.info : '' ) : '' ) ) );
 							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
 							var nowiki = true;
-						} else {
+						}
+						else {
 							console.log( '- ' + ( response ? response.statusCode + ': ' : '' ) + 'Error while reaching the wiki' + ( error ? ': ' + error : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
 							var comment = ' I got an error while checking if the wiki exists!';
 						}
@@ -745,7 +746,8 @@ function checkGames(channels, mention) {
 							temp_settings[channel._id].wiki = 'https://' + channel.game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com/';
 							call++;
 							saveCheckedGames(temp_settings, updated, call, mention);
-						} else {
+						}
+						else {
 							var wiki = allSites.find( site => site.wiki_display_name === channel.game + ' Wiki (EN)' && ( site.ss_good_articles >= 100 || site.official_wiki ) );
 							if ( wiki ) {
 								temp_settings[channel._id].wiki = 'https://' + wiki.wiki_domain + '/';
@@ -775,7 +777,8 @@ function checkGames(channels, mention) {
 											temp_settings[channel._id].wiki = 'https://' + channel.game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com/';
 											call++;
 											saveCheckedGames(temp_settings, updated, call, mention);
-										} else {
+										}
+										else {
 											wiki = allSites.find( site => site.wiki_display_name === channel.game + ' Wiki (EN)' && ( site.ss_good_articles >= 100 || site.official_wiki ) );
 											if ( wiki ) {
 												temp_settings[channel._id].wiki = 'https://' + wiki.wiki_domain + '/';
@@ -799,11 +802,11 @@ function checkGames(channels, mention) {
 												saveCheckedGames(temp_settings, updated, call, mention);
 											} );
 										}
-										else {
-											channel.text = 'I couldn\'t find a wiki for this game, I kept the default wiki to: ';
-											call++;
-											saveCheckedGames(temp_settings, updated, call, mention);
-										}
+									}
+									else {
+										channel.text = 'I couldn\'t find a wiki for this game, I kept the default wiki to: ';
+										call++;
+										saveCheckedGames(temp_settings, updated, call, mention);
 									}
 								}
 							} );
