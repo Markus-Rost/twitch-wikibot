@@ -720,7 +720,7 @@ bot.on( 'notice', function(channel, msgid, msg) {
 	if ( msgid !== 'host_target_went_offline' ) console.log( channel + ': ' + msg );
 } );
 
-var interval = setInterval( checkGames, 300000 );
+var interval = setInterval( checkGames, 60000 );
 
 function checkGames(channels, mention) {
 	if ( !channels ) channels = Object.keys(botsettings).filter( channel => botsettings[channel].game !== undefined );
