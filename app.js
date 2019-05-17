@@ -62,13 +62,15 @@ function getSettings() {
 	} );
 }
 
-function checkChannels() {
-	var channels = Object.keys(botsettings);
-	var streams = bot.getChannels();
-	console.log( '- Joined ' + streams.length + ' out of ' + channels.length + ' streams.' );
-	channels = channels.filter( channel => !streams.includes( '#' + botsettings[channel].name ) );
+function checkChannels(channels) {
+	if ( !channels ) {
+		channels = Object.keys(botsettings);
+		console.log( '- Joined ' + bot.getChannels().length + ' out of ' + channels.length + ' streams.' );
+		channels = channels.filter( channel => !bot.getChannels().includes( '#' + botsettings[channel].name ) );
+	}
+	if ( channels.length > 100 ) checkChannels(channels.slice(100));
 	if ( channels.length ) request( {
-		uri: 'https://api.twitch.tv/kraken/channels?id=' + channels.join(','),
+		uri: 'https://api.twitch.tv/kraken/channels?id=' + channels.slice(0, 100).join(','),
 		headers: kraken,
 		json: true
 	}, function( delerror, delresponse, delbody ) {
@@ -286,7 +288,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 		}
 		else {
 			var temp_settings = JSON.parse(JSON.stringify(botsettings));
-			temp_settings[userstate['user-id']] = { wiki, name: userstate.username };
+			temp_settings[userstate['user-id']] = { name: userstate.username, wiki };
 			request.post( {
 				uri: process.env.save,
 				headers: access,
@@ -724,8 +726,9 @@ var interval = setInterval( checkGames, 60000 );
 
 function checkGames(channels, mention) {
 	if ( !channels ) channels = Object.keys(botsettings).filter( channel => botsettings[channel].game !== undefined );
+	if ( channels.length > 100 ) checkGames(channels.slice(100), mention);
 	if ( channels.length ) request( {
-		uri: 'https://api.twitch.tv/kraken/channels?id=' + channels.join(','),
+		uri: 'https://api.twitch.tv/kraken/channels?id=' + channels.slice(0, 100).join(','),
 		headers: kraken,
 		json: true
 	}, function( error, response, body ) {
