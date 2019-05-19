@@ -394,7 +394,7 @@ function bot_link(channel, title, wiki) {
 			}
 			else {
 				console.log( '- ' + ( response ? response.statusCode + ': ' : '' ) + 'Error while getting the search results' + ( error ? ': ' + error : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
-				bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + ( title ? 'Special:Search?search=' + title.toSearch() : '' ) );
+				bot.say( channel, 'I got an error while searching: ' + wiki.toLink(( title ? 'Special:Search' : '' ), ( title ? 'search=' + title.toSearch() : '' )) );
 			}
 		}
 		else {
@@ -414,7 +414,7 @@ function bot_link(channel, title, wiki) {
 				}
 					
 				if ( ( querypage.missing !== undefined && querypage.known === undefined ) || querypage.invalid !== undefined ) {
-					if ( /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
+					if ( wiki.isFandom() ) {
 						request( {
 							uri: wiki + 'api/v1/Search/List?minArticleQuality=0&namespaces=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=1&query=' + encodeURIComponent( title ) + '&format=json',
 							json: true
@@ -425,7 +425,7 @@ function bot_link(channel, title, wiki) {
 								}
 								else {
 									console.log( '- ' + ( wsresponse ? wsresponse.statusCode + ': ' : '' ) + 'Error while getting the search results' + ( wserror ? ': ' + wserror : ( wsbody ? ( wsbody.exception ? ': ' + wsbody.exception.details : '.' ) : '.' ) ) );
-									bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search?search=' + title.toSearch() );
+									bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body) );
 								}
 							}
 							else {
@@ -443,13 +443,13 @@ function bot_link(channel, title, wiki) {
 								else {
 									text = 'I found this for you: ';
 								}
-								text += wiki.toLink() + querypage.title.toTitle();
+								text += wiki.toLink(querypage.title, '', '', body);
 								if ( querypage.title === body.query.general.mainpage && body.query.allmessages[0]['*'] ) {
 										text += ' – ' + body.query.allmessages[0]['*'];
 										bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 								}
 								else request( {
-									uri: wiki.toLink() + encodeURIComponent( querypage.title.replace( / /g, '_' ) )
+									uri: wiki.toDescLink(querypage.title)
 								}, function( descerror, descresponse, descbody ) {
 									if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 										console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
@@ -474,7 +474,7 @@ function bot_link(channel, title, wiki) {
 						}, function( srerror, srresponse, srbody ) {
 							if ( srerror || !srresponse || srresponse.statusCode !== 200 || !srbody ) {
 								console.log( '- ' + ( srresponse ? srresponse.statusCode + ': ' : '' ) + 'Error while getting the search results' + ( srerror ? ': ' + srerror : ( srbody ? ( srbody.error ? ': ' + srbody.error.info : '.' ) : '.' ) ) );
-								bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Search?search=' + title.toSearch() );
+								bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body) );
 							}
 							else {
 								if ( !srbody.query ) {
@@ -492,7 +492,7 @@ function bot_link(channel, title, wiki) {
 									else {
 										text = 'I found this for you: ';
 									}
-									text += wiki.toLink() + querypage.title.toTitle();
+									text += wiki.toLink(querypage.title, '', '', body);
 									if ( querypage.pageprops && querypage.pageprops.description ) {
 										var parser = new htmlparser.Parser( {
 											ontext: (htmltext) => {
@@ -510,7 +510,7 @@ function bot_link(channel, title, wiki) {
 					}
 				}
 				else {
-					var text = wiki.toLink() + querypage.title.toTitle() + ( body.query.redirects && body.query.redirects[0].tofragment ? '#' + body.query.redirects[0].tofragment.toSection() : '' );
+					var text = wiki.toLink(querypage.title, '', ( body.query.redirects ? body.query.redirects[0].tofragment : '' ), body);
 					if ( querypage.pageprops && querypage.pageprops.description ) {
 						var parser = new htmlparser.Parser( {
 							ontext: (htmltext) => {
@@ -524,8 +524,8 @@ function bot_link(channel, title, wiki) {
 					else if ( querypage.title === body.query.general.mainpage && body.query.allmessages[0]['*'] ) {
 						text += ' – ' + body.query.allmessages[0]['*'];
 					}
-					if ( !text.includes( ' – ' ) && /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) request( {
-						uri: wiki.toLink() + encodeURIComponent( querypage.title.replace( / /g, '_' ) )
+					if ( !text.includes( ' – ' ) && wiki.isFandom() ) request( {
+						uri: wiki.toDescLink(querypage.title)
 					}, function( descerror, descresponse, descbody ) {
 						if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 							console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
@@ -559,13 +559,13 @@ function bot_link(channel, title, wiki) {
 				}
 			}
 			else {
-				var text = wiki.toLink() + body.query.general.mainpage.toTitle();
+				var text = wiki.toLink(body.query.general.mainpage, '', '', body);
 				if ( body.query.allmessages[0]['*'] ) {
 					text += ' – ' + body.query.allmessages[0]['*'];
 					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				}
-				else if ( /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) request( {
-					uri: wiki.toLink() + encodeURIComponent( body.query.general.mainpage.replace( / /g, '_' ) )
+				else if ( wiki.isFandom() ) request( {
+					uri: wiki.toDescLink(body.query.general.mainpage)
 				}, function( descerror, descresponse, descbody ) {
 					if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 						console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
@@ -608,7 +608,7 @@ function bot_link(channel, title, wiki) {
 
 function bot_random(channel, wiki) {
 	request( {
-		uri: wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=random&grnnamespace=0&format=json',
+		uri: wiki + 'api.php?action=query&meta=allmessages|siteinfo&ammessages=description&amenableparser=true&siprop=general&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=random&grnnamespace=0&format=json',
 		json: true
 	}, function( error, response, body ) {
 		if ( error || !response || response.statusCode !== 200 || !body || !body.query || !body.query.pages ) {
@@ -618,12 +618,12 @@ function bot_random(channel, wiki) {
 			}
 			else {
 				console.log( '- ' + ( response ? response.statusCode + ': ' : '' ) + 'Error while getting the search results' + ( error ? ': ' + error : ( body ? ( body.error ? ': ' + body.error.info : '.' ) : '.' ) ) );
-				bot.say( channel, 'I got an error while searching: ' + wiki.toLink() + 'Special:Random' );
+				bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Random') );
 			}
 		}
 		else {
 			var querypage = Object.values(body.query.pages)[0];
-			var text = '🎲 ' + wiki.toLink() + querypage.title.toTitle();
+			var text = '🎲 ' + wiki.toLink(querypage.title, '', '', body);
 			if ( querypage.pageprops && querypage.pageprops.description ) {
 				var parser = new htmlparser.Parser( {
 					ontext: (htmltext) => {
@@ -634,10 +634,11 @@ function bot_random(channel, wiki) {
 				parser.end();
 			}
 			else if ( querypage.extract ) text += ' – ' + querypage.extract;
-			else if ( /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(wiki) ) {
+			else if ( querypage.title === body.query.general.mainpage && body.query.allmessages[0]['*'] ) text += ' – ' + body.query.allmessages[0]['*'];
+			else if ( wiki.isFandom() ) {
 				var nosend = true;
 				request( {
-					uri: wiki.toLink() + encodeURIComponent( querypage.title.replace( / /g, '_' ) )
+					uri: wiki.toDescLink(querypage.title)
 				}, function( descerror, descresponse, descbody ) {
 					if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
 						console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
@@ -664,22 +665,34 @@ String.prototype.noWiki = function() {
 	else return this.replace( /^https:\/\/([a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org))\/(?:[a-z-]{1,8}\/)?$/, 'https://community.fandom.com/wiki/Community_Central:Not_a_valid_community?from=$1' );
 };
 
-String.prototype.toLink = function() {
-	if ( this.endsWith( '.gamepedia.com/' ) ) return this;
-	else if ( this.endsWith( '.org/w/' ) && !this.endsWith( '.wikia.org/w/' ) ) return this.substring(0, this.length - 2) + 'wiki/';
-	else return this + 'wiki/';
+String.prototype.isFandom = function() {
+	return /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(this);
 };
 
-String.prototype.toTitle = function() {
-	return this.replace( / /g, '_' ).replace( /\%/g, '%25' ).replace( /\,/g, '%2C').replace( /\'/g, '%27' ).replace( /\!/g, '%21' ).replace( /\?/g, '%3F' );
+String.prototype.toLink = function(title = '', querystring = '', fragment = '', path) {
+	var linksuffix = ( querystring ? '?' + querystring.toTitle(true) : '' ) + ( fragment ? '#' + fragment.toSection() : '' );
+	if ( this.endsWith( '.gamepedia.com/' ) ) return this + title.toTitle() + linksuffix;
+	else if ( this.isFandom() ) return this + 'wiki/' + title.toTitle() + linksuffix;
+	else if ( path ) return this.substring(0, this.length - path.query.general.scriptpath.length - 1) + path.query.general.articlepath.replaceSave( '$1', title.toTitle() ) + linksuffix;
+	else return this + 'index.php?title=' + title.toTitle(true) + ( linksuffix.startsWith( '?' ) ? '&' + linksuffix.substring(1) : linksuffix );
+};
+
+String.prototype.toTitle = function(inQuery) {
+	var title = this.replace( / /g, '_' ).replace( /\%/g, '%25' ).replace( /\,/g, '%2C').replace( /\'/g, '%27' ).replace( /\!/g, '%21' );
+	if ( inQuery ) return title.replace( /\&/g, '%26' );
+	else return title.replace( /\?/g, '%3F' );
 };
 
 String.prototype.toSearch = function() {
-	return encodeURIComponent( this ).replace( /%20/g, '+' );
+	return this.replace( / /g, '+' );
 };
 
 String.prototype.toSection = function() {
 	return encodeURIComponent( this.replace( / /g, '_' ) ).replace( /\'/g, '%27' ).replace( /\(/g, '%28' ).replace( /\)/g, '%29' ).replace( /\%/g, '.' );
+};
+
+String.prototype.toDescLink = function(title = '') {
+	return this + 'wiki/' + encodeURIComponent( title.replace( / /g, '_' ) );
 };
 
 String.prototype.replaceSave = function(pattern, replacement) {
