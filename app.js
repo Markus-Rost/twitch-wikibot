@@ -787,8 +787,8 @@ function checkGames(channels, mention) {
 										call++;
 										saveCheckedGames(temp_settings, updated, call, mention);
 									}
-									else if ( / (?:\d{1,2}|[IV]{1,3})$/.test(channel.game) ) {
-										channel.game = channel.game.replace( / (?:\d{1,2}|[IV]{1,3})$/, '' );
+									else if ( /(?: \d{1,2}| [IV]{1,3}|: .+)$/.test(channel.game) ) {
+										channel.game = channel.game.replace( /(?: \d{1,2}| [IV]{1,3}|: .+)$/, '' );
 										if ( allSites.some( site => site.wiki_domain === channel.game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' && ( site.ss_good_articles >= 100 || site.official_wiki ) ) ) {
 											temp_settings[channel._id].wiki = 'https://' + channel.game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com/';
 											call++;
