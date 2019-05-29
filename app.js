@@ -6,7 +6,7 @@ const TwitchJS = require('twitch-js');
 var request = require('request');
 var htmlparser = require('htmlparser2');
 
-var isDebug = ( process.argv[2] === 'debug' ? true : false );
+var isDebug = ( process.argv[2] === 'debug' );
 
 var options = {
 	options: {
@@ -415,8 +415,45 @@ function bot_link(channel, title, wiki) {
 					
 				if ( ( querypage.missing !== undefined && querypage.known === undefined ) || querypage.invalid !== undefined ) {
 					if ( wiki.isFandom() ) {
-						request( {
-							uri: wiki + 'api/v1/Search/List?minArticleQuality=0&namespaces=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=1&query=' + encodeURIComponent( title ) + '&format=json',
+						if ( querypage.ns === 1201 ) {
+							var thread = querypage.title.split(':');
+							request( {
+								uri: wiki + 'api.php?action=query&pageids=' + thread.slice(1).join(':') + '&format=json',
+								json: true
+							}, function( therror, thresponse, thbody ) {
+								if ( therror || !thresponse || thresponse.statusCode !== 200 || !thbody || !thbody.query || !thbody.query.pages ) {
+									console.log( '- ' + ( thresponse ? thresponse.statusCode + ': ' : '' ) + 'Error while getting the thread' + ( therror ? ': ' + therror : ( thbody ? ( thbody.error ? ': ' + thbody.error.info : '.' ) : '.' ) ) );
+									bot.say( channel, 'I got an error while searching: ' + wiki.toLink(querypage.title, '', '', body) );
+								}
+								else {
+									querypage = thbody.query.pages[thread.slice(1).join(':')];
+									if ( querypage.missing !== undefined ) {
+										bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
+									}
+									else {
+										var text = wiki.toLink(thread.join(':'), '', '', body);
+										request( {
+											uri: wiki.toDescLink(querypage.title)
+										}, function( descerror, descresponse, descbody ) {
+											if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
+												console.log( '- ' + ( descresponse ? descresponse.statusCode + ': ' : '' ) + 'Error while getting the description' + ( descerror ? ': ' + descerror : '.' ) );
+											} else {
+												var parser = new htmlparser.Parser( {
+													onopentag: (tagname, attribs) => {
+														if ( tagname === 'meta' && attribs.property === 'og:description' ) text += ' – ' + attribs.content;
+													}
+												}, {decodeEntities:true} );
+												parser.write( descbody );
+												parser.end();
+											}
+											bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+										} );
+									}
+								}
+							} );
+						}
+						else request( {
+							uri: wiki + 'api/v1/Search/List?minArticleQuality=0&namespaces=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=10&query=' + encodeURIComponent( title ) + '&format=json',
 							json: true
 						}, function( wserror, wsresponse, wsbody ) {
 							if ( wserror || !wsresponse || wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.items ) {
