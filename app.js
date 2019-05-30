@@ -111,11 +111,11 @@ function checkChannels(channels) {
 					}
 					else {
 						botsettings = JSON.parse(JSON.stringify(temp_settings));
-						console.log( '- I updated streams, that got renamed.' );
+						if ( renamed ) console.log( '- I updated streams, that got renamed.' );
 						if ( channels.length ) {
 							bot.whisper( process.env.ownername, 'I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
 							console.log( '- I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
-						} else console.log( '- I updated streams, that got renamed.' );
+						}
 						checkChannels();
 					}
 				} );
