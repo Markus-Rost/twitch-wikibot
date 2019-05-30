@@ -19,7 +19,7 @@ var options = {
 		secure: true
 	},
 	identity: {
-		username: 'WikiBot',
+		username: process.env.botname,
 		password: 'oauth:' + process.env.oauth
 	},
 	channels: []
@@ -95,7 +95,7 @@ function checkChannels(channels) {
 					headers: access,
 					body: {
 						branch: 'master',
-						commit_message: 'WikiBot: Settings updated or removed.',
+						commit_message: process.env.botname + ': Settings updated or removed.',
 						actions: [
 							{
 								action: 'update',
@@ -113,7 +113,7 @@ function checkChannels(channels) {
 						botsettings = JSON.parse(JSON.stringify(temp_settings));
 						console.log( '- I updated streams, that got renamed.' );
 						if ( channels.length ) {
-							bot.whisper( 'markus_rost', 'I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
+							bot.whisper( process.env.ownername, 'I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
 							console.log( '- I removed streams, that didn\'t exist anymore: ' + channels.join(', ') );
 						} else console.log( '- I updated streams, that got renamed.' );
 						checkChannels();
@@ -166,7 +166,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 					headers: access,
 					body: {
 						branch: 'master',
-						commit_message: 'WikiBot: Games updated.',
+						commit_message: process.env.botname + ': Games updated.',
 						actions: [
 							{
 								action: 'update',
@@ -232,7 +232,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 							headers: access,
 							body: {
 								branch: 'master',
-								commit_message: 'WikiBot: Settings updated.',
+								commit_message: process.env.botname + ': Settings updated.',
 								actions: [
 									{
 										action: 'update',
@@ -294,7 +294,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 				headers: access,
 				body: {
 					branch: 'master',
-					commit_message: 'WikiBot: Settings added.',
+					commit_message: process.env.botname + ': Settings added.',
 					actions: [
 						{
 							action: 'update',
@@ -321,7 +321,7 @@ function bot_join(channel, userstate, msg, args, wiki) {
 						json: true
 					}, function( fwerror, fwresponse, fwbody ) {
 						if ( fwerror || !fwresponse || fwresponse.statusCode !== 200 || !fwbody || fwbody.error ) {
-							bot.whisper( 'markus_rost', 'Error while following ' + userstate['display-name'] );
+							bot.whisper( process.env.ownername, 'Error while following ' + userstate['display-name'] );
 							console.log( '- ' + ( fwresponse ? fwresponse.statusCode + ': ' : '' ) + 'Error while following ' + userstate['display-name'] + ( fwerror ? ': ' + fwerror.message : ( fwbody ? ( fwbody.message ? ': ' + fwbody.message : ( fwbody.error ? ': ' + fwbody.error : '.' ) ) : '.' ) ) );
 						} else console.log( '- I\'m now following ' + userstate['display-name'] + '.' );
 					} );
@@ -342,7 +342,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 			headers: access,
 			body: {
 				branch: 'master',
-				commit_message: 'WikiBot: Settings removed.',
+				commit_message: process.env.botname + ': Settings removed.',
 				actions: [
 					{
 						action: 'update',
@@ -369,7 +369,7 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 					json: true
 				}, function( fwerror, fwresponse, fwbody ) {
 					if ( fwerror || !fwresponse || fwresponse.statusCode !== 204 || fwbody ) {
-						bot.whisper( 'markus_rost', 'Error while unfollowing ' + userstate['display-name'] );
+						bot.whisper( process.env.ownername, 'Error while unfollowing ' + userstate['display-name'] );
 						console.log( '- ' + ( fwresponse ? fwresponse.statusCode + ': ' : '' ) + 'Error while unfollowing ' + userstate['display-name'] + ( fwerror ? ': ' + fwerror.message : ( fwbody ? ( fwbody.message ? ': ' + fwbody.message : ( fwbody.error ? ': ' + fwbody.error : '.' ) ) : '.' ) ) );
 					} else console.log( '- I\'m not following ' + userstate['display-name'] + ' anymore.' );
 				} );
@@ -882,7 +882,7 @@ function saveCheckedGames(temp_settings, updated, call, mention) {
 		headers: access,
 		body: {
 			branch: 'master',
-			commit_message: 'WikiBot: Games updated.',
+			commit_message: process.env.botname + ': Games updated.',
 			actions: [
 				{
 					action: 'update',
