@@ -80,14 +80,14 @@ function checkChannels(channels) {
 		else {
 			var renamed = false;
 			delbody.channels.forEach( channel => {
-				bot.join(channel.name).catch( error => console.log( '#' + channel.name + ': ' + error ) );
+				bot.join(channel.name).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( '#' + channel.name + ': ' + error ) ) );
 				if ( botsettings[channel._id].name !== channel.name ) {
 					botsettings[channel._id].name = channel.name;
 					renamed = true;
 				}
 			} );
 			if ( renamed || delbody.channels.length !== channels.length ) {
-				channels = channels.filter( channel => !delbody.channels.some( user => user._id === channel ) );
+				channels = channels.filter( channel => !delbody.channels.some( user => user._id.toString() === channel ) );
 				var temp_settings = JSON.parse(JSON.stringify(botsettings));
 				channels.forEach( channel => delete temp_settings[channel] );
 				request.post( {
