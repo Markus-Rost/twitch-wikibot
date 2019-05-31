@@ -273,7 +273,7 @@ async function bot_eval(channel, userstate, msg, args, wiki) {
 		} catch ( error ) {
 			var text = error.name + ': ' + error.message;
 		}
-		if ( isDebug ) console.log( '--- EVAL START ---\n\u200b' + text.replace( /\n/g, '\n\u200b' ) + '\n--- EVAL END ---' );
+		if ( isDebug ) console.log( '--- EVAL START ---\n' + text + '\n--- EVAL END ---' );
 		if ( text.length > 450 ) bot.say( channel, 'gamepediaWIKIBOT ✅' ).catch( err => bot.say( channel, err.name + ': ' + err.message ) );
 		else bot.say( channel, 'gamepediaWIKIBOT ' + text ).catch( err => bot.say( channel, err.name + ': ' + err.message ) );
 	} else {
@@ -715,7 +715,7 @@ String.prototype.toLink = function(title = '', querystring = '', fragment = '', 
 };
 
 String.prototype.toTitle = function(inQuery) {
-	var title = this.replace( / /g, '_' ).replace( /\%/g, '%25' ).replace( /\,/g, '%2C').replace( /\'/g, '%27' ).replace( /\!/g, '%21' );
+	var title = this.replace( / /g, '_' ).replace( /\%/g, '%25' ).replace( /\,/g, '%2C').replace( /\'/g, '%27' ).replace( /\!/g, '%21' ).replace( /\"/g, '%22' );
 	if ( inQuery ) return title.replace( /\&/g, '%26' );
 	else return title.replace( /\?/g, '%3F' );
 };
