@@ -8,7 +8,7 @@ var htmlparser = require('htmlparser2');
 
 var isDebug = ( process.argv[2] === 'debug' );
 
-var options = {
+var bot = new TwitchJS.client( {
 	options: {
 		clientId: process.env.client,
 		debug: isDebug
@@ -23,9 +23,7 @@ var options = {
 		password: 'oauth:' + process.env.oauth
 	},
 	channels: []
-}
-
-var bot = new TwitchJS.client(options);
+} );
 
 const access = {'PRIVATE-TOKEN': process.env.access};
 const kraken = {
