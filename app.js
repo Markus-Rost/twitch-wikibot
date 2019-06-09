@@ -713,7 +713,7 @@ String.prototype.toLink = function(title = '', querystring = '', fragment = '', 
 };
 
 String.prototype.toTitle = function(inQuery) {
-	var title = this.replace( / /g, '_' ).replace( /\%/g, '%25' ).replace( /\,/g, '%2C').replace( /\'/g, '%27' ).replace( /\!/g, '%21' ).replace( /\"/g, '%22' );
+	var title = encodeURI( this.replace( / /g, '_' ) ).replace( /\,/g, '%2C').replace( /\'/g, '%27' ).replace( /\!/g, '%21' );
 	if ( inQuery ) return title.replace( /\&/g, '%26' );
 	else return title.replace( /\?/g, '%3F' );
 };
