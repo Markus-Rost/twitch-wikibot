@@ -243,7 +243,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 							json: true
 						}, function( serror, sresponse, sbody ) {
 							if ( serror || !sresponse || sresponse.statusCode !== 201 || !sbody || sbody.error ) {
-								console.log( '- ' + ( sresponse && sresponse.statusCode ) + ': Error while editing the settings: ' + ( serror || sbody ? ( sbody.message || sbody.error ) ) );
+								console.log( '- ' + ( sresponse && sresponse.statusCode ) + ': Error while editing the settings: ' + ( serror || sbody && ( sbody.message || sbody.error ) ) );
 								bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
 							}
 							else {
