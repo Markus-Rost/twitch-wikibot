@@ -270,7 +270,7 @@ async function bot_eval(channel, userstate, msg, args, wiki) {
 		try {
 			var text = util.inspect( await eval( args.join(' ') ) );
 		} catch ( error ) {
-			var text = error.name + ': ' + error.message;
+			var text = error.toString();
 		}
 		if ( isDebug ) console.log( '--- EVAL START ---\n' + text + '\n--- EVAL END ---' );
 		if ( text.length > 450 ) bot.say( channel, 'gamepediaWIKIBOT ✅' );
