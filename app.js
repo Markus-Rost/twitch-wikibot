@@ -455,8 +455,8 @@ function bot_link(channel, title, wiki) {
 							uri: wiki + 'api/v1/Search/List?minArticleQuality=0&namespaces=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=10&query=' + encodeURIComponent( title ) + '&format=json',
 							json: true
 						}, function( wserror, wsresponse, wsbody ) {
-							if ( wserror || !wsresponse || wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.items ) {
-								if ( wsbody && wsbody.exception && wsbody.exception.code === 404 ) {
+							if ( wserror || !wsresponse || wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.total || !wsbody.items || !wsbody.items.length ) {
+								if ( wsbody && ( !wsbody.total || ( wsbody.items && !wsbody.items.length ) || ( wsbody.exception && wsbody.exception.code === 404 ) ) ) {
 									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
 								}
 								else {
@@ -910,4 +910,4 @@ function saveCheckedGames(temp_settings, updated, call, mention) {
 	} );
 }
 
-bot.connect();
+bot.connect().catch( error => console.log( '- Error while connecting: ' + error ) );
