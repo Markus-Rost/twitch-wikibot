@@ -140,7 +140,7 @@ function getAllSites() {
 }
 
 bot.on('connected', function(address, port) {
-	console.log( '- Successfully logged in!' );
+	console.log( '\n- Successfully logged in!' );
 	getSettings();
 	getAllSites();
 });
@@ -213,7 +213,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 					json: true
 				}, function( error, response, body ) {
 					if ( error || !response || response.statusCode !== 200 || !body || !( body instanceof Object ) ) {
-						if ( forced || ( response && response.request && response.request.uri && wikinew.noWiki(response.request.uri.href) ) ) {
+						if ( forced || ( response && response.request && response.request.uri && wikinew.noWiki(response.request.uri.href) || response.statusCode === 410 ) ) {
 							console.log( '- This wiki doesn\'t exist!' );
 							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
 							var nowiki = true;
@@ -387,7 +387,7 @@ function bot_link(channel, title, wiki) {
 		json: true
 	}, function( error, response, body ) {
 		if ( error || !response || response.statusCode !== 200 || !body || !body.query ) {
-			if ( response && response.request && response.request.uri && wiki.noWiki(response.request.uri.href) ) {
+			if ( response && response.request && response.request.uri && wiki.noWiki(response.request.uri.href) || response.statusCode === 410 ) {
 				console.log( '- This wiki doesn\'t exist!' );
 				bot.say( channel, 'This wiki does not exist!' );
 			}
@@ -648,7 +648,7 @@ function bot_random(channel, wiki) {
 		json: true
 	}, function( error, response, body ) {
 		if ( error || !response || response.statusCode !== 200 || !body || !body.query || !body.query.pages ) {
-			if ( response && response.request && response.request.uri && wiki.noWiki(response.request.uri.href) ) {
+			if ( response && response.request && response.request.uri && wiki.noWiki(response.request.uri.href) || response.statusCode === 410 ) {
 				console.log( '- This wiki doesn\'t exist!' );
 				bot.say( channel, 'This wiki does not exist!' );
 			}
