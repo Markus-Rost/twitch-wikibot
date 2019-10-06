@@ -10,7 +10,7 @@ var stop = false;
 var isDebug = ( process.argv[2] === 'debug' );
 
 const sqlite3 = require('sqlite3').verbose();
-var db = new sqlite3.Database( process.env.database, sqlite3.OPEN_READWRITE, error => {
+var db = new sqlite3.Database( './wikibot.db', 'OPEN_READWRITE | OPEN_CREATE', error => {
 	if ( error ) {
 		console.log( '- Error while connecting to the database: ' + error );
 		return error;
@@ -45,9 +45,24 @@ function getSettings(trysettings = 1) {
 	db.all( 'SELECT id, name FROM twitch', [], (dberror, rows) => {
 		if ( dberror ) {
 			console.log( '- ' + trysettings + '. Error while getting the settings: ' + dberror );
-			if ( trysettings < 10 ) {
-				trysettings++;
-				getSettings(trysettings);
+			if ( dberror.message === 'SQLITE_ERROR: no such table: twitch' ) {
+				db.run( 'CREATE TABLE IF NOT EXISTS twitch(id INTEGER PRIMARY KEY UNIQUE NOT NULL, name STRING NOT NULL, wiki STRING NOT NULL DEFAULT [https://help.gamepedia.com/], game STRING) WITHOUT ROWID;', [], function (error) {
+					if ( error ) {
+						console.log( '- Error while creating the table: ' + error );
+						return error;
+					}
+					console.log( '- Created the table.' );
+					if ( trysettings < 10 ) {
+						trysettings++;
+						getSettings(trysettings);
+					}
+				} );
+			}
+			else {
+				if ( trysettings < 10 ) {
+					trysettings++;
+					getSettings(trysettings);
+				}
 			}
 			return dberror;
 		}
@@ -660,6 +675,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 		db.get( 'SELECT wiki FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
 			if ( dberror || !row ) {
 				console.log( '- Error while getting the wiki: ' + dberror );
+				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I got an error!' )
 				return dberror;
 			}
 			var wiki = row.wiki;
@@ -702,9 +718,12 @@ const checkGamesInterval = setInterval( () => {
 }, 60000 );
 
 function checkGames(channels, mention) {
-	if ( channels.length > 100 ) checkGames(channels.slice(100), mention);
-	request( {
-		uri: 'https://api.twitch.tv/kraken/channels?id=' + channels.slice(0, 100).map( channel => channel.id ).join(','),
+	if ( channels.length > 100 ) {
+		checkGames(channels.slice(100), mention);
+		channels = channels.slice(0, 100);
+	}
+	if ( channels.length ) request( {
+		uri: 'https://api.twitch.tv/kraken/channels?id=' + channels.map( channel => channel.id ).join(','),
 		headers: kraken,
 		json: true
 	}, function( error, response, body ) {
