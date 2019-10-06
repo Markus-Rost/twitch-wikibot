@@ -10,13 +10,13 @@ var stop = false;
 var isDebug = ( process.argv[2] === 'debug' );
 
 const sqlite3 = require('sqlite3').verbose();
-var db = new sqlite3.Database( './wikibot.db', 'OPEN_READWRITE | OPEN_CREATE', error => {
-	if ( error ) {
-		console.log( '- Error while connecting to the database: ' + error );
-		return error;
+var db = new sqlite3.Database( './wikibot.db', 'OPEN_READWRITE | OPEN_CREATE', dberror => {
+	if ( dberror ) {
+		console.log( '- Error while connecting to the database: ' + dberror );
+		return dberror;
 	}
 	console.log( '- Connected to the database.' );
-} )
+} );
 
 var bot = new TwitchJS.client( {
 	options: {
@@ -675,7 +675,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 		db.get( 'SELECT wiki FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
 			if ( dberror || !row ) {
 				console.log( '- Error while getting the wiki: ' + dberror );
-				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I got an error!' )
+				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I got an error!' );
 				return dberror;
 			}
 			var wiki = row.wiki;
