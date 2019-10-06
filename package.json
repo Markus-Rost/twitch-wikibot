@@ -12,8 +12,9 @@
   "dependencies": {
     "dotenv": "^6.2.0",
     "htmlparser2": "^3.10.1",
-    "npm": "^6.10.3",
+    "npm": "^6.11.3",
     "request": "^2.88.0",
+    "sqlite3": "^4.1.0",
     "twitch-js": "^1.2.17"
   },
   "repository": {
