@@ -46,12 +46,19 @@ function getSettings(trysettings = 1) {
 		if ( dberror ) {
 			console.log( '- ' + trysettings + '. Error while getting the settings: ' + dberror );
 			if ( dberror.message === 'SQLITE_ERROR: no such table: twitch' ) {
-				db.run( 'CREATE TABLE IF NOT EXISTS twitch(id INTEGER PRIMARY KEY UNIQUE NOT NULL, name STRING NOT NULL, wiki STRING NOT NULL DEFAULT [https://help.gamepedia.com/], game STRING) WITHOUT ROWID;', [], function (error) {
+				db.run( 'CREATE TABLE IF NOT EXISTS twitch(id INTEGER PRIMARY KEY UNIQUE NOT NULL, name STRING NOT NULL, wiki STRING NOT NULL DEFAULT [https://help.gamepedia.com/], game STRING) WITHOUT ROWID', [], function (error) {
 					if ( error ) {
 						console.log( '- Error while creating the table: ' + error );
 						return error;
 					}
 					console.log( '- Created the table.' );
+					db.run( 'CREATE INDEX idx_twitch_channel ON twitch(id)', [], function (idxerror) {
+						if ( idxerror ) {
+							console.log( '- Error while creating the index: ' + idxerror );
+							return error;
+						}
+						console.log( '- Created the index.' );
+					} );
 					if ( trysettings < 10 ) {
 						trysettings++;
 						getSettings(trysettings);
