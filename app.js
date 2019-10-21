@@ -42,11 +42,23 @@ const kraken = {
 }
 
 function getSettings(trysettings = 1) {
-	db.all( 'SELECT id, name FROM twitch', [], (dberror, rows) => {
+	var channels = [];
+	db.each( 'SELECT id, name FROM twitch', [], (dberror, row) => {
+		if ( dberror ) {
+			console.log( '- ' + trysettings + '. Error while getting the setting: ' + dberror );
+			if ( trysettings < 10 ) {
+				trysettings++;
+				getSettings(trysettings);
+			}
+			return dberror;
+		}
+		bot.join(row.name).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( '#' + row.name + ': ' + error ) ) );
+		channels.push(row);
+	}, (dberror) => {
 		if ( dberror ) {
 			console.log( '- ' + trysettings + '. Error while getting the settings: ' + dberror );
 			if ( dberror.message === 'SQLITE_ERROR: no such table: twitch' ) {
-				db.run( 'CREATE TABLE IF NOT EXISTS twitch(id INTEGER PRIMARY KEY UNIQUE NOT NULL, name STRING NOT NULL, wiki STRING NOT NULL DEFAULT [https://help.gamepedia.com/], game STRING) WITHOUT ROWID', [], function (error) {
+				db.run( 'CREATE TABLE IF NOT EXISTS twitch(id INTEGER PRIMARY KEY UNIQUE NOT NULL, name TEXT NOT NULL, wiki TEXT NOT NULL DEFAULT [https://help.gamepedia.com/], game TEXT) WITHOUT ROWID', [], function (error) {
 					if ( error ) {
 						console.log( '- Error while creating the table: ' + error );
 						return error;
@@ -74,13 +86,10 @@ function getSettings(trysettings = 1) {
 			return dberror;
 		}
 		console.log( '- Settings successfully loaded.' );
-		rows.forEach( channel => {
-			bot.join(channel.name).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( '#' + channel.name + ': ' + error ) ) );
-		} );
 		
 		setTimeout( () => {
-			console.log( '- Joined ' + bot.getChannels().length + ' out of ' + rows.length + ' streams.' );
-			var channels = rows.filter( channel => !bot.getChannels().includes( '#' + channel.name ) );
+			console.log( '- Joined ' + bot.getChannels().length + ' out of ' + channels.length + ' streams.' );
+			channels = channels.filter( channel => !bot.getChannels().includes( '#' + channel.name ) );
 			checkChannels(channels);
 		}, 10000 ).unref();
 	} );
@@ -715,12 +724,19 @@ bot.on( 'notice', function(channel, msgid, msg) {
 } );
 
 const checkGamesInterval = setInterval( () => {
-	db.all( 'SELECT id, game FROM twitch WHERE game IS NOT NULL', [], (dberror, rows) => {
+	var channels = [];
+	db.each( 'SELECT id, game FROM twitch WHERE game IS NOT NULL', [], (dberror, row) => {
+		if ( dberror ) {
+			console.log( '- Error while getting the game setting: ' + dberror );
+			return dberror;
+		}
+		channels.push(row);
+	}, (dberror) => {
 		if ( dberror ) {
 			console.log( '- Error while getting the game settings: ' + dberror );
 			return dberror;
 		}
-		checkGames(rows);
+		checkGames(channels);
 	} );
 }, 60000 );
 
