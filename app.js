@@ -677,7 +677,7 @@ String.prototype.toDescLink = function(title = '') {
 };
 
 String.prototype.replaceSave = function(pattern, replacement) {
-	return this.replace( pattern, ( typeof replacement === 'string' ? replacement.replace( '$', '$$$$' ) : replacement ) );
+	return this.replace( pattern, ( typeof replacement === 'string' ? replacement.replace( /\$/g, '$$$$' ) : replacement ) );
 };
 
 bot.on( 'chat', function(channel, userstate, msg, self) {
@@ -808,14 +808,14 @@ function checkGames(channels, mention) {
 											else {
 												wiki = ws2body.items.find( site => site.stats.articles >= 100 );
 												if ( wiki ) channel.wiki = wiki.url + '/';
-												else channel.text = 'I couldn\'t find a wiki for this game, I kept the current default wiki.';
+												else channel.text = 'I couldn\'t find a wiki for "' + channel.game + '", I kept the current default wiki.';
 											}
 											saveCheckedGames(channel, mention);
 										} );
 									}
 								}
 								else {
-									channel.text = 'I couldn\'t find a wiki for this game, I kept the current default wiki.';
+									channel.text = 'I couldn\'t find a wiki for "' + channel.game + '", I kept the current default wiki.';
 									saveCheckedGames(channel, mention);
 								}
 							}
@@ -861,10 +861,10 @@ async function graceful(code = 0) {
 		await bot.disconnect();
 		await db.close( dberror => {
 			if ( dberror ) {
-				console.log( '- SIGTERM: Error while closing the database: ' + dberror );
+				console.log( '- SIGTERM: Error while closing the database connection: ' + dberror );
 				return dberror;
 			}
-			console.log( '- SIGTERM: Closed the database.' );
+			console.log( '- SIGTERM: Closed the database connection.' );
 		} );
 		setTimeout( async () => {
 			console.log( '- SIGTERM: Closing takes too long, terminating!' );
