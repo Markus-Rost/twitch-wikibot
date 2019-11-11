@@ -36,3 +36,9 @@ Twitch channel: [https://www.twitch.tv/WikiBot](https://www.twitch.tv/WikiBot)
 ### `!wiki leave @<your name>`
 **WikiBot** will leave your stream chat.
 <br>*Can only be used on your own stream.*
+
+### `[[<page name>]]`
+**WikiBot** will answer with the link without description.
+
+### `{{<page name>}}`
+**WikiBot** will answer with the link with description.

@@ -2,12 +2,17 @@ require('dotenv').config();
 const util = require('util');
 util.inspect.defaultOptions = {compact:false,breakLength:Infinity};
 
+var isDebug = ( process.argv[2] === 'debug' );
+
 const TwitchJS = require('twitch-js');
-var request = require('request');
+var request = require('request').defaults( {
+	headers: {
+		'User-Agent': 'WikiBot/' + ( isDebug ? 'testing' : process.env.npm_package_version ) + ' (Twitch; ' + process.env.npm_package_name + ')'
+	}
+} );
 var htmlparser = require('htmlparser2');
 
 var stop = false;
-var isDebug = ( process.argv[2] === 'debug' );
 
 const sqlite3 = require('sqlite3').verbose();
 var db = new sqlite3.Database( './wikibot.db', sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, dberror => {
@@ -680,21 +685,35 @@ String.prototype.replaceSave = function(pattern, replacement) {
 	return this.replace( pattern, ( typeof replacement === 'string' ? replacement.replace( /\$/g, '$$$$' ) : replacement ) );
 };
 
+String.prototype.splitText = function(length, split = '\n', messages = []) {
+	var snippet = this.substring(0, length);
+	var message = snippet.split(split);
+	var text = message.pop() + this.substring(length);
+	messages.push( message.join(split) );
+	if ( text > length ) text.splitText(length, split, messages);
+	else {
+		messages.push( text );
+		return messages
+	}
+}
+
 bot.on( 'chat', function(channel, userstate, msg, self) {
 	// Don't listen to my own messages..
 	if ( stop || self ) return;
 
 	// Do your stuff.
-	if ( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix ) {
-		if ( !allSites.length ) getAllSites();
-		console.log( channel + ': ' + msg );
-		db.get( 'SELECT wiki FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
-			if ( dberror || !row ) {
-				console.log( '- Error while getting the wiki: ' + dberror );
-				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I got an error!' );
-				return dberror;
-			}
-			var wiki = row.wiki;
+	if ( !( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix || msg.includes( '[[' ) || msg.includes( '{{' ) ) ) return;
+	if ( !allSites.length ) getAllSites();
+	console.log( channel + ': ' + msg );
+	db.get( 'SELECT wiki FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
+		if ( dberror || !row ) {
+			console.log( '- Error while getting the wiki: ' + dberror );
+			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I got an error!' );
+			return dberror;
+		}
+		var wiki = row.wiki;
+
+		if ( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix ) {
 			var args = msg.split(' ').slice(1);
 			if ( args[0] ) {
 				var invoke = args[0].toLowerCase();
@@ -715,8 +734,97 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 			else {
 				bot_link(channel, args.join(' '), wiki);
 			}
-		} );
-	}
+		}
+		else if ( msg.includes( '[[' ) || msg.includes( '{{' ) ) {
+			var regex = new RegExp( '(?<!\\\\)\\[\\[([' + " %!\"$&'()*,\\-.\\/0-9:;=?@A-Z\\\\^_`a-z~\\x80-\\xFF+" + ']+)(?:\\|.*?)?\\]\\]', 'g' );
+			var entry = null;
+			var links = [];
+			var count = 0;
+			var maxcount = 5;
+			while ( ( entry = regex.exec(msg) ) !== null ) {
+				if ( count < maxcount ) links.push({title:entry[1]});
+				else if ( count === maxcount ) {
+					console.log( '- Message contains too many links!' );
+					break;
+				}
+				count++;
+			}
+			if ( links.length ) request( {
+				uri: wiki + 'api.php?action=query&iwurl=true&titles=' + encodeURIComponent( links.map( link => link.title ).join('|') ) + '&format=json',
+				json: true
+			}, function( error, response, body ) {
+				if ( error || !response || response.statusCode !== 200 || !body || !body.query ) {
+					if ( response && ( response.request && response.request.uri && wiki.noWiki(response.request.uri.href) || response.statusCode === 410 ) ) {
+						console.log( '- This wiki doesn\'t exist!' );
+						bot.say( channel, 'This wiki does not exist!' );
+						return;
+					}
+					console.log( '- ' + ( response && response.statusCode ) + ': Error while following the link: ' + ( error || body && body.error && body.error.info ) );
+					return;
+				}
+				if ( body.query.normalized ) {
+					body.query.normalized.forEach( title => links.filter( link => link.title === title.from ).forEach( link => link.title = title.to ) );
+				}
+				if ( body.query.interwiki ) {
+					body.query.interwiki.forEach( interwiki => links.filter( link => link.title === interwiki.title ).forEach( link => link.url = interwiki.url ) );
+				}
+				if ( body.query.pages ) {
+					var querypages = Object.values(body.query.pages);
+					querypages.filter( page => page.missing !== undefined ).forEach( page => links.filter( link => link.title === page.title ).forEach( link => {
+						link.url = wiki.toLink() + link.title.toTitle() + '?action=edit&redlink=1';
+					} ) );
+					querypages.filter( page => page.invalid !== undefined ).forEach( page => links.filter( link => link.title === page.title ).forEach( link => {
+						links.splice(links.indexOf(link), 1);
+					} ) );
+				}
+				if ( links.length ) {
+					var messages = links.map( link => ( link.url || wiki.toLink() + link.title.toTitle() ) ).join(' – ').splitText(450, ' – ');
+					messages.forEach( message => bot.say( channel, message ) );
+				}
+			} );
+			
+			regex = new RegExp( '(?<!\\\\)\\{\\{([' + " %!\"$&'()*,\\-.\\/0-9:;=?@A-Z\\\\^_`a-z~\\x80-\\xFF+" + ']+)(?:\\|.*?)?\\}\\}', 'g' );
+			embeds = [];
+			count = 0;
+			maxcount = 3;
+			while ( ( entry = regex.exec(msg) ) !== null ) {
+				if ( count < maxcount ) embeds.push({title:entry[1]});
+				else if ( count === maxcount ) {
+					console.log( '- Message contains too many links!' );
+					break;
+				}
+				count++;
+			}
+			if ( embeds.length ) request( {
+				uri: wiki + 'api.php?action=query&titles=' + encodeURIComponent( embeds.map( embed => embed.title ).join('|') ) + '&format=json',
+				json: true
+			}, function( error, response, body ) {
+				if ( error || !response || response.statusCode !== 200 || !body || !body.query ) {
+					if ( response && ( response.request && response.request.uri && wiki.noWiki(response.request.uri.href) || response.statusCode === 410 ) ) {
+						console.log( '- This wiki doesn\'t exist!' );
+						bot.say( channel, 'This wiki does not exist!' );
+						return;
+					}
+					console.log( '- ' + ( response && response.statusCode ) + ': Error while following the link: ' + ( error || body && body.error && body.error.info ) );
+					return;
+				}
+				if ( body.query.normalized ) {
+					body.query.normalized.forEach( title => embeds.filter( embed => embed.title === title.from ).forEach( embed => embed.title = title.to ) );
+				}
+				if ( body.query.pages ) {
+					var querypages = Object.values(body.query.pages);
+					querypages.filter( page => page.missing !== undefined ).forEach( page => embeds.filter( embed => embed.title === page.title ).forEach( embed => {
+						bot.say( channel, wiki.toLink() + embed.title.toTitle() + '?action=edit&redlink=1' );
+						embeds.splice(embeds.indexOf(embed), 1);
+					} ) );
+					querypages.filter( page => page.invalid !== undefined ).forEach( page => embeds.filter( embed => embed.title === page.title ).forEach( embed => {
+						embeds.splice(embeds.indexOf(embed), 1);
+					} ) );
+				}
+				if ( embeds.length ) embeds.forEach( embed => bot_link(channel, embed.title, wiki) );
+			} );
+		}
+	} );
 } );
 
 bot.on( 'notice', function(channel, msgid, msg) {
