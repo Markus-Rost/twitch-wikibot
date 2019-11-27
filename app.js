@@ -4,7 +4,7 @@ util.inspect.defaultOptions = {compact:false,breakLength:Infinity};
 
 var isDebug = ( process.argv[2] === 'debug' );
 
-const TwitchJS = require('twitch-js');
+const tmi = require('tmi.js');
 var request = require('request').defaults( {
 	headers: {
 		'User-Agent': 'WikiBot/' + ( isDebug ? 'testing' : process.env.npm_package_version ) + ' (Twitch; ' + process.env.npm_package_name + ')'
@@ -23,13 +23,12 @@ var db = new sqlite3.Database( './wikibot.db', sqlite3.OPEN_READWRITE | sqlite3.
 	console.log( '- Connected to the database.' );
 } );
 
-var bot = new TwitchJS.client( {
+var bot = new tmi.client( {
 	options: {
 		clientId: process.env.client,
 		debug: isDebug
 	},
 	connection: {
-		cluster: 'aws',
 		reconnect: true,
 		secure: true
 	},
@@ -736,13 +735,17 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 			}
 		}
 		else if ( msg.includes( '[[' ) || msg.includes( '{{' ) ) {
-			var regex = new RegExp( '(?<!\\\\)\\[\\[([' + " %!\"$&'()*,\\-.\\/0-9:;=?@A-Z\\\\^_`a-z~\\x80-\\xFF+" + ']+)(?:\\|.*?)?\\]\\]', 'g' );
+			var regex = new RegExp( '(?<!\\\\)\\[\\[([^' + "<>\\[\\]\\|{}\\x01-\\x1F\\x7F" + ']+)(?<!\\\\)\\]\\]', 'g' );
 			var entry = null;
 			var links = [];
 			var count = 0;
 			var maxcount = 5;
 			while ( ( entry = regex.exec(msg) ) !== null ) {
-				if ( count < maxcount ) links.push({title:entry[1]});
+				if ( count < maxcount ) {
+					let title = entry[1].split('#')[0];
+					let section = ( entry[1].includes( '#' ) ? '#' + entry[1].split('#').slice(1).join('#') : '' )
+					links.push({title,section});
+				}
 				else if ( count === maxcount ) {
 					console.log( '- Message contains too many links!' );
 					break;
@@ -759,7 +762,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 						bot.say( channel, 'This wiki does not exist!' );
 						return;
 					}
-					console.log( '- ' + ( response && response.statusCode ) + ': Error while following the link: ' + ( error || body && body.error && body.error.info ) );
+					console.log( '- ' + ( response && response.statusCode ) + ': Error while following the links: ' + ( error || body && body.error && body.error.info ) );
 					return;
 				}
 				if ( body.query.normalized ) {
@@ -770,25 +773,30 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 				}
 				if ( body.query.pages ) {
 					var querypages = Object.values(body.query.pages);
-					querypages.filter( page => page.missing !== undefined ).forEach( page => links.filter( link => link.title === page.title ).forEach( link => {
-						link.url = wiki.toLink() + link.title.toTitle() + '?action=edit&redlink=1';
-					} ) );
 					querypages.filter( page => page.invalid !== undefined ).forEach( page => links.filter( link => link.title === page.title ).forEach( link => {
 						links.splice(links.indexOf(link), 1);
 					} ) );
+					querypages.filter( page => page.missing !== undefined && page.known === undefined ).forEach( page => links.filter( link => link.title === page.title ).forEach( link => {
+						if ( ( page.ns === 2 || page.ns === 202 ) && !page.title.includes( '/' ) ) return;
+						link.url = wiki.toLink() + link.title.toTitle() + '?action=edit&redlink=1';
+					} ) );
 				}
 				if ( links.length ) {
-					var messages = links.map( link => ( link.url || wiki.toLink() + link.title.toTitle() ) ).join(' – ').splitText(450, ' – ');
+					var messages = links.map( link => ( link.url || wiki.toLink() + link.title.toTitle() ) + link.section.toSection() ).join(' – ').splitText(450, ' – ');
 					messages.forEach( message => bot.say( channel, message ) );
 				}
 			} );
 			
-			regex = new RegExp( '(?<!\\\\)\\{\\{([' + " %!\"$&'()*,\\-.\\/0-9:;=?@A-Z\\\\^_`a-z~\\x80-\\xFF+" + ']+)(?:\\|.*?)?\\}\\}', 'g' );
-			embeds = [];
+			regex = new RegExp( '(?<!\\\\)(?<!\\{)\\{\\{([^' + "<>\\[\\]\\|{}\\x01-\\x1F\\x7F" + ']+)(?<!\\\\)\\}\\}', 'g' );
+			var embeds = [];
 			count = 0;
 			maxcount = 3;
 			while ( ( entry = regex.exec(msg) ) !== null ) {
-				if ( count < maxcount ) embeds.push({title:entry[1]});
+				if ( count < maxcount ) {
+					let title = entry[1].split('#')[0];
+					let section = ( entry[1].includes( '#' ) ? '#' + entry[1].split('#').slice(1).join('#') : '' )
+					embeds.push({title,section});
+				}
 				else if ( count === maxcount ) {
 					console.log( '- Message contains too many links!' );
 					break;
@@ -805,7 +813,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 						bot.say( channel, 'This wiki does not exist!' );
 						return;
 					}
-					console.log( '- ' + ( response && response.statusCode ) + ': Error while following the link: ' + ( error || body && body.error && body.error.info ) );
+					console.log( '- ' + ( response && response.statusCode ) + ': Error while following the links: ' + ( error || body && body.error && body.error.info ) );
 					return;
 				}
 				if ( body.query.normalized ) {
@@ -813,15 +821,16 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 				}
 				if ( body.query.pages ) {
 					var querypages = Object.values(body.query.pages);
-					querypages.filter( page => page.missing !== undefined ).forEach( page => embeds.filter( embed => embed.title === page.title ).forEach( embed => {
-						bot.say( channel, wiki.toLink() + embed.title.toTitle() + '?action=edit&redlink=1' );
-						embeds.splice(embeds.indexOf(embed), 1);
-					} ) );
 					querypages.filter( page => page.invalid !== undefined ).forEach( page => embeds.filter( embed => embed.title === page.title ).forEach( embed => {
 						embeds.splice(embeds.indexOf(embed), 1);
 					} ) );
+					querypages.filter( page => page.missing !== undefined && page.known === undefined ).forEach( page => embeds.filter( embed => embed.title === page.title ).forEach( embed => {
+						if ( ( page.ns === 2 || page.ns === 202 ) && !page.title.includes( '/' ) ) return;
+						bot.say( channel, wiki.toLink() + embed.title.toTitle() + '?action=edit&redlink=1' + embed.section.toSection() );
+						embeds.splice(embeds.indexOf(embed), 1);
+					} ) );
 				}
-				if ( embeds.length ) embeds.forEach( embed => bot_link(channel, embed.title, wiki) );
+				if ( embeds.length ) embeds.forEach( embed => bot_link(channel, embed.title + embed.section, wiki) );
 			} );
 		}
 	} );
