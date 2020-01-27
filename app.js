@@ -280,6 +280,8 @@ function bot_join(channel, userstate, msg, args, wiki) {
 			bot.join(userstate.username);
 			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I joined your stream.' );
 			
+			checkGames([{id:parseInt(userstate['user-id'], 10),game:null}], [userstate.username,userstate['display-name']]);
+			
 			request.put( {
 				uri: 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'],
 				headers: kraken,
@@ -743,7 +745,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 			while ( ( entry = regex.exec(msg) ) !== null ) {
 				if ( count < maxcount ) {
 					let title = entry[1].split('#')[0];
-					let section = ( entry[1].includes( '#' ) ? '#' + entry[1].split('#').slice(1).join('#') : '' )
+					let section = ( entry[1].includes( '#' ) ? entry[1].split('#').slice(1).join('#') : '' )
 					links.push({title,section});
 				}
 				else if ( count === maxcount ) {
@@ -769,7 +771,9 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 					body.query.normalized.forEach( title => links.filter( link => link.title === title.from ).forEach( link => link.title = title.to ) );
 				}
 				if ( body.query.interwiki ) {
-					body.query.interwiki.forEach( interwiki => links.filter( link => link.title === interwiki.title ).forEach( link => link.url = interwiki.url ) );
+					body.query.interwiki.forEach( interwiki => links.filter( link => link.title === interwiki.title ).forEach( link => {
+						link.url = interwiki.url + ( link.section ? '#' + link.section.toSection() : '' );
+					} ) );
 				}
 				if ( body.query.pages ) {
 					var querypages = Object.values(body.query.pages);
@@ -782,7 +786,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 					} ) );
 				}
 				if ( links.length ) {
-					var messages = links.map( link => ( link.url || wiki.toLink() + link.title.toTitle() ) + link.section.toSection() ).join(' – ').splitText(450, ' – ');
+					var messages = links.map( link => ( link.url || wiki.toLink() + link.title.toTitle() + ( link.section ? '#' + link.section.toSection() : '' ) ) ).join(' – ').splitText(450, ' – ');
 					messages.forEach( message => bot.say( channel, message ) );
 				}
 			} );
@@ -794,7 +798,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 			while ( ( entry = regex.exec(msg) ) !== null ) {
 				if ( count < maxcount ) {
 					let title = entry[1].split('#')[0];
-					let section = ( entry[1].includes( '#' ) ? '#' + entry[1].split('#').slice(1).join('#') : '' )
+					let section = ( entry[1].includes( '#' ) ? entry[1].split('#').slice(1).join('#') : '' )
 					embeds.push({title,section});
 				}
 				else if ( count === maxcount ) {
@@ -826,7 +830,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 					} ) );
 					querypages.filter( page => page.missing !== undefined && page.known === undefined ).forEach( page => embeds.filter( embed => embed.title === page.title ).forEach( embed => {
 						if ( ( page.ns === 2 || page.ns === 202 ) && !page.title.includes( '/' ) ) return;
-						bot.say( channel, wiki.toLink() + embed.title.toTitle() + '?action=edit&redlink=1' + embed.section.toSection() );
+						bot.say( channel, wiki.toLink() + embed.title.toTitle() + '?action=edit&redlink=1' );
 						embeds.splice(embeds.indexOf(embed), 1);
 					} ) );
 				}
