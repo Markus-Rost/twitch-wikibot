@@ -45,6 +45,8 @@ const kraken = {
 	Authorization: 'OAuth ' + process.env.oauth
 }
 
+var cooldown = {};
+
 function getSettings(trysettings = 1) {
 	var channels = [];
 	db.each( 'SELECT id, name FROM twitch', [], (dberror, row) => {
@@ -56,13 +58,13 @@ function getSettings(trysettings = 1) {
 			}
 			return dberror;
 		}
-		bot.join(row.name).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( '#' + row.name + ': ' + error ) ) );
+		bot.join(row.name).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( '#' + row.name + ': ', error ) ) );
 		channels.push(row);
 	}, (dberror) => {
 		if ( dberror ) {
 			console.log( '- ' + trysettings + '. Error while getting the settings: ' + dberror );
 			if ( dberror.message === 'SQLITE_ERROR: no such table: twitch' ) {
-				db.run( 'CREATE TABLE IF NOT EXISTS twitch(id INTEGER PRIMARY KEY UNIQUE NOT NULL, name TEXT NOT NULL, wiki TEXT NOT NULL DEFAULT [https://help.gamepedia.com/], game TEXT) WITHOUT ROWID', [], function (error) {
+				db.run( 'CREATE TABLE IF NOT EXISTS twitch(id INTEGER PRIMARY KEY UNIQUE NOT NULL, name TEXT NOT NULL, wiki TEXT NOT NULL DEFAULT [https://help.gamepedia.com/], game TEXT, cooldown INTEGER NOT NULL DEFAULT [0]) WITHOUT ROWID', [], function (error) {
 					if ( error ) {
 						console.log( '- Error while creating the table: ' + error );
 						return error;
@@ -115,14 +117,38 @@ function checkChannels(channels) {
 		}
 		else {
 			body.channels.forEach( user => {
-				bot.join(user.name).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( '#' + user.name + ': ' + error ) ) );
-				if ( channels.find( channel => channel.id === user._id ).name !== user.name ) {
+				var oldname = channels.find( channel => channel.id === user._id ).name;
+				bot.join(user.name).catch( error => {
+					if ( ['msg_channel_suspended','tos_ban','msg_banned','msg_room_not_found'].includes(error) ) {
+						db.run( 'DELETE FROM twitch WHERE id = ?', [user._id], function (dberror) {
+							if ( dberror ) {
+								console.log( '- Error while removing ' + user.name + ' for ' + error + ': ' + dberror );
+								return dberror;
+							}
+							bot.whisper( process.env.ownername, 'I removed ' + user.name + ' for: ' + error );
+							console.log( '- I removed #' + user.name + ' for: ' + error );
+						} );
+						
+						request.delete( {
+							uri: 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + user._id,
+							headers: kraken,
+							json: true
+						}, function( error, response, body ) {
+							if ( error || !response || response.statusCode !== 204 || body ) {
+								bot.whisper( process.env.ownername, 'Error while unfollowing ' + user.name );
+								console.log( '- ' + ( response && response.statusCode ) + ': Error while unfollowing ' + user.name + ': ' + ( error || body && ( body.message || body.error ) ) );
+							} else console.log( '- I\'m not following ' + user.name + ' anymore.' );
+						} );
+					}
+					else console.log( '#' + user.name + ': ', error );
+				} );
+				if ( oldname !== user.name ) {
 					db.run( 'UPDATE twitch SET name = ? WHERE id = ?', [user.name, user._id], function (dberror) {
 						if ( dberror ) {
-							console.log( '- Error while changing the name to #' + user.name + ': ' + dberror );
+							console.log( '- Error while changing the name from ' + oldname + ' to #' + user.name + ': ' + dberror );
 							return dberror;
 						}
-						console.log( '- Name successfully changed to #' + user.name + '.' );
+						console.log( '- Name successfully changed from #' + oldname + ' to #' + user.name + '.' );
 					} );
 				}
 			} );
@@ -130,7 +156,7 @@ function checkChannels(channels) {
 				channels = channels.filter( channel => !body.channels.some( user => user._id === channel.id ) );
 				db.run( 'DELETE FROM twitch WHERE id IN (' + channels.map( channel => '?' ).join(', ') + ')', channels.map( channel => channel.id ), function (dberror) {
 					if ( dberror ) {
-						console.log( '- Error while removing names: ' + dberror );
+						console.log( '- Error while removing non-existing streams ' + channels.map( channel => '#' + channel.name ).join(', ') + ': ' + dberror );
 						return dberror;
 					}
 					bot.whisper( process.env.ownername, 'I removed streams, that didn\'t exist anymore: ' + channels.map( channel => '#' + channel.name ).join(', ') );
@@ -166,6 +192,7 @@ bot.on('connected', function(address, port) {
 
 var cmds = {
 	setwiki: bot_setwiki,
+	setcooldown: bot_cooldown,
 	eval: bot_eval,
 	join: bot_join,
 	leave: bot_leave
@@ -320,6 +347,30 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 					console.log( '- ' + ( response && response.statusCode ) + ': Error while unfollowing ' + userstate['display-name'] + ': ' + ( error || body && ( body.message || body.error ) ) );
 				} else console.log( '- I\'m not following ' + userstate['display-name'] + ' anymore.' );
 			} );
+		} );
+	} else {
+		bot_link(channel, msg.split(' ').slice(1).join(' '), wiki);
+	}
+}
+
+function bot_cooldown(channel, userstate, msg, args, wiki) {
+	if ( /^(|\d+)$/.test(args.join(' ')) && ( userstate.mod || userstate['user-id'] === userstate['room-id'] || userstate['user-id'] === process.env.owner ) ) {
+		if ( args.join(' ').length ) db.run( 'UPDATE twitch SET cooldown = ? WHERE id = ?', [args[0] + '000', userstate['room-id']], function (dberror) {
+			if ( dberror ) {
+				console.log( '- Error while editing the settings: ' + dberror );
+				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t set the cooldown :(' );
+				return dberror;
+			}
+			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I set the cooldown to ' + args[0] + ' seconds.' );
+			console.log( '- Settings successfully updated.' );
+		} );
+		else db.get( 'SELECT cooldown FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
+			if ( dberror || !row ) {
+				console.log( '- Error while getting the cooldown: ' + dberror );
+				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t get the cooldown :(' );
+				return dberror;
+			}
+			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', the cooldown is set to ' + ( row.cooldown / 1000 ) + ' seconds.' );
 		} );
 	} else {
 		bot_link(channel, msg.split(' ').slice(1).join(' '), wiki);
@@ -699,19 +750,19 @@ String.prototype.splitText = function(length, split = '\n', messages = []) {
 }
 
 bot.on( 'chat', function(channel, userstate, msg, self) {
-	// Don't listen to my own messages..
 	if ( stop || self ) return;
-
-	// Do your stuff.
+	
 	if ( !( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix || msg.includes( '[[' ) || msg.includes( '{{' ) ) ) return;
 	if ( !allSites.length ) getAllSites();
 	console.log( channel + ': ' + msg );
-	db.get( 'SELECT wiki FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
+	db.get( 'SELECT wiki, cooldown FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
 		if ( dberror || !row ) {
 			console.log( '- Error while getting the wiki: ' + dberror );
 			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I got an error!' );
 			return dberror;
 		}
+		if ( ( cooldown[channel] || 0 ) + row.cooldown > Date.now() ) return console.log( '- ' + channel + ' is still on cooldown.' );
+		cooldown[channel] = Date.now();
 		var wiki = row.wiki;
 
 		if ( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix ) {
@@ -838,6 +889,16 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 			} );
 		}
 	} );
+} );
+
+bot.on( 'whisper', function(channel, userstate, msg, self) {
+	if ( stop || self ) return;
+	
+	if ( channel === '#' + process.env.ownername.toLowerCase() ) {
+		var args = msg.split(' ');
+		if ( args[0].startsWith( '#' ) && args.length >= 2 ) bot.whisper( args[0], args.splice(1).join(' ') );
+	}
+	else bot.whisper( process.env.ownername, channel + ': ' + msg );
 } );
 
 bot.on( 'notice', function(channel, msgid, msg) {
