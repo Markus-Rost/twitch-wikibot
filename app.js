@@ -5,12 +5,13 @@ util.inspect.defaultOptions = {compact:false,breakLength:Infinity};
 var isDebug = ( process.argv[2] === 'debug' );
 
 const tmi = require('tmi.js');
-var request = require('request').defaults( {
+const got = require('got').extend( {
+	throwHttpErrors: false,
 	headers: {
-		'User-Agent': 'WikiBot/' + ( isDebug ? 'testing' : process.env.npm_package_version ) + ' (Twitch; ' + process.env.npm_package_name + ')'
+		'user-agent': 'WikiBot/' + ( isDebug ? 'testing' : process.env.npm_package_version ) + ' (Twitch; ' + process.env.npm_package_name + ')'
 	}
 } );
-var htmlparser = require('htmlparser2');
+const htmlparser = require('htmlparser2');
 
 var stop = false;
 
@@ -107,13 +108,13 @@ function checkChannels(channels) {
 		checkChannels(channels.slice(100));
 		channels = channels.slice(0, 100);
 	}
-	if ( channels.length ) request( {
-		uri: 'https://api.twitch.tv/kraken/channels?id=' + channels.map( channel => channel.id ).join(','),
+	if ( channels.length ) got.get( 'https://api.twitch.tv/kraken/channels?id=' + channels.map( channel => channel.id ).join(','), {
 		headers: kraken,
-		json: true
-	}, function( error, response, body ) {
-		if ( error || !response || response.statusCode !== 200 || !body || body.error || !body.channels ) {
-			console.log( '- ' + ( response && response.statusCode ) + ': Error while checking missing streams: ' + ( error || body && ( body.message || body.error ) ) );
+		responseType: 'json'
+	} ).then( response => {
+		var body = response.body;
+		if ( response.statusCode !== 200 || !body || body.error || !body.channels ) {
+			console.log( '- ' + response.statusCode + ': Error while checking missing streams: ' + ( body && ( body.message || body.error ) ) );
 		}
 		else {
 			body.channels.forEach( user => {
@@ -129,15 +130,18 @@ function checkChannels(channels) {
 							console.log( '- I removed #' + user.name + ' for: ' + error );
 						} );
 						
-						request.delete( {
-							uri: 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + user._id,
+						got.delete( 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + user._id, {
 							headers: kraken,
-							json: true
-						}, function( error, response, body ) {
-							if ( error || !response || response.statusCode !== 204 || body ) {
+							responseType: 'json'
+						} ).then( delresponse => {
+							var delbody = delresponse.body;
+							if ( delresponse.statusCode !== 204 || delbody ) {
 								bot.whisper( process.env.ownername, 'Error while unfollowing ' + user.name );
-								console.log( '- ' + ( response && response.statusCode ) + ': Error while unfollowing ' + user.name + ': ' + ( error || body && ( body.message || body.error ) ) );
+								console.log( '- ' + delresponse.statusCode + ': Error while unfollowing ' + user.name + ': ' + ( delbody && ( delbody.message || delbody.error ) ) );
 							} else console.log( '- I\'m not following ' + user.name + ' anymore.' );
+						}, delerror => {
+							bot.whisper( process.env.ownername, 'Error while unfollowing ' + user.name );
+							console.log( '- Error while unfollowing ' + user.name + ': ' + delerror );
 						} );
 					}
 					else console.log( '#' + user.name + ': ', error );
@@ -164,23 +168,27 @@ function checkChannels(channels) {
 				} );
 			}
 		}
+	}, error => {
+		console.log( '- Error while checking missing streams: ' + error );
 	} );
 }
 
 var allSites = [];
 
 function getAllSites() {
-	request( {
-		uri: 'https://help.gamepedia.com/api.php?action=allsites&formatversion=2&do=getSiteStats&filter=wikis|wiki_domain,wiki_display_name,wiki_managers,official_wiki,created,ss_good_articles&format=json',
-		json: true
-	}, function( error, response, body ) {
-		if ( error || !response || response.statusCode !== 200 || !body || body.status !== 'okay' || !body.data || !body.data.wikis ) {
-			console.log( '- ' + ( response && response.statusCode ) + ': Error while gettings all sites: ' + ( error || body && body.error && body.error.info ) );
+	got.get( 'https://help.gamepedia.com/api.php?action=allsites&formatversion=2&do=getSiteStats&filter=wikis|wiki_domain,wiki_display_name,wiki_managers,official_wiki,created,ss_good_articles&format=json', {
+		responseType: 'json'
+	} ).then( response => {
+		var body = response.body;
+		if ( response.statusCode !== 200 || !body || body.status !== 'okay' || !body.data || !body.data.wikis ) {
+			console.log( '- ' + response.statusCode + ': Error while gettings all sites: ' + ( body && body.error && body.error.info ) );
 		}
 		else {
 			console.log( '- Sites successfully loaded.' );
 			allSites = JSON.parse(JSON.stringify(body.data.wikis.filter( site => /^[a-z\d-]{1,50}\.gamepedia\.com$/.test(site.wiki_domain) )));
 		}
+	}, error => {
+			console.log( '- Error while gettings all sites: ' + error );
 	} );
 }
 
@@ -238,20 +246,41 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 				if ( wiki === wikinew && !forced ) {
 					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', the default wiki is already set to: ' + wiki );
 				}
-				else request( {
-					uri: wikinew + 'api.php?action=query&format=json',
-					json: true
-				}, function( error, response, body ) {
-					if ( error || !response || response.statusCode !== 200 || !body || !( body instanceof Object ) ) {
-						if ( forced || ( response && ( response.request && response.request.uri && wikinew.noWiki(response.request.uri.href) || response.statusCode === 410 ) ) ) {
+				else got.get( wikinew + 'api.php?action=query&format=json', {
+					responseType: 'json'
+				} ).then( response => {
+					var body = response.body;
+					if ( response.statusCode !== 200 || !body || !( body instanceof Object ) ) {
+						if ( forced || wikinew.noWiki(response.url) || response.statusCode === 410 ) {
 							console.log( '- This wiki doesn\'t exist!' );
 							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
 							var nowiki = true;
 						}
 						else {
-							console.log( '- ' + ( response && response.statusCode ) + ': Error while reaching the wiki: ' + ( error || body && body.error && body.error.info ) );
+							console.log( '- ' + response.statusCode + ': Error while reaching the wiki: ' + ( body && body.error && body.error.info ) );
 							comment = ' I got an error while checking if the wiki exists!';
 						}
+					}
+					if ( !nowiki ) {
+						db.run( 'UPDATE twitch SET wiki = ? WHERE id = ?', [wikinew, userstate['room-id']], function (dberror) {
+							if ( dberror ) {
+								console.log( '- Error while editing the settings: ' + dberror );
+								bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
+								return dberror;
+							}
+							console.log( '- Settings successfully updated.' );
+							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced || 'changed' ) + ' the default wiki to: ' + wikinew + comment );
+						} );
+					}
+				}, error => {
+					if ( forced || wikinew.noWiki(error.message) ) {
+						console.log( '- This wiki doesn\'t exist!' );
+						bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
+						var nowiki = true;
+					}
+					else {
+						console.log( '- Error while reaching the wiki: ' + error );
+						comment = ' I got an error while checking if the wiki exists!';
 					}
 					if ( !nowiki ) {
 						db.run( 'UPDATE twitch SET wiki = ? WHERE id = ?', [wikinew, userstate['room-id']], function (dberror) {
@@ -309,15 +338,18 @@ function bot_join(channel, userstate, msg, args, wiki) {
 			
 			checkGames([{id:parseInt(userstate['user-id'], 10),game:null}], [userstate.username,userstate['display-name']]);
 			
-			request.put( {
-				uri: 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'],
+			got.put( 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'], {
 				headers: kraken,
-				json: true
-			}, function( error, response, body ) {
-				if ( error || !response || response.statusCode !== 200 || !body || body.error ) {
+				responseType: 'json'
+			} ).then( response => {
+				var body = response.body;
+				if ( response.statusCode !== 200 || !body || body.error ) {
 					bot.whisper( process.env.ownername, 'Error while following ' + userstate['display-name'] );
-					console.log( '- ' + ( response && response.statusCode ) + ': Error while following ' + userstate['display-name'] + ': ' + ( error || body && ( body.message || body.error ) ) );
+					console.log( '- ' + response.statusCode + ': Error while following ' + userstate['display-name'] + ': ' + ( body && ( body.message || body.error ) ) );
 				} else console.log( '- I\'m now following ' + userstate['display-name'] + '.' );
+			}, error => {
+				bot.whisper( process.env.ownername, 'Error while following ' + userstate['display-name'] );
+				console.log( '- Error while following ' + userstate['display-name'] + ': ' + error );
 			} );
 		} );
 	} else {
@@ -337,15 +369,18 @@ function bot_leave(channel, userstate, msg, args, wiki) {
 			console.log( '- I\'ve been removed from a stream.' );
 			bot.part(userstate.username);
 			
-			request.delete( {
-				uri: 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'],
+			got.delete( 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'], {
 				headers: kraken,
-				json: true
-			}, function( error, response, body ) {
-				if ( error || !response || response.statusCode !== 204 || body ) {
+				responseType: 'json'
+			} ).then( response => {
+				var body = response.body;
+				if ( response.statusCode !== 204 || body ) {
 					bot.whisper( process.env.ownername, 'Error while unfollowing ' + userstate['display-name'] );
-					console.log( '- ' + ( response && response.statusCode ) + ': Error while unfollowing ' + userstate['display-name'] + ': ' + ( error || body && ( body.message || body.error ) ) );
+					console.log( '- ' + response.statusCode + ': Error while unfollowing ' + userstate['display-name'] + ': ' + ( body && ( body.message || body.error ) ) );
 				} else console.log( '- I\'m not following ' + userstate['display-name'] + ' anymore.' );
+			}, error => {
+				bot.whisper( process.env.ownername, 'Error while unfollowing ' + userstate['display-name'] );
+				console.log( '- Error while unfollowing ' + userstate['display-name'] + ': ' + error );
 			} );
 		} );
 	} else {
@@ -380,17 +415,17 @@ function bot_cooldown(channel, userstate, msg, args, wiki) {
 function bot_link(channel, title, wiki) {
 	if ( title.length > 300 ) title = title.substring(0, 300);
 	if ( title.toLowerCase() === 'random' ) bot_random(channel, wiki);
-	else request( {
-		uri: wiki + 'api.php?action=query&meta=allmessages|siteinfo&ammessages=description&amenableparser=true&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( title ) + '&format=json',
-		json: true
-	}, function( error, response, body ) {
-		if ( error || !response || response.statusCode !== 200 || !body || !body.query ) {
-			if ( response && ( response.request && response.request.uri && wiki.noWiki(response.request.uri.href) || response.statusCode === 410 ) ) {
+	else got.get( wiki + 'api.php?action=query&meta=allmessages|siteinfo&ammessages=description&amenableparser=true&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( title ) + '&format=json', {
+		responseType: 'json'
+	} ).then( response => {
+		var body = response.body;
+		if ( response.statusCode !== 200 || !body || !body.query ) {
+			if ( wiki.noWiki(response.url) || response.statusCode === 410 ) {
 				console.log( '- This wiki doesn\'t exist!' );
 				bot.say( channel, 'This wiki does not exist!' );
 			}
 			else {
-				console.log( '- ' + ( response && response.statusCode ) + ': Error while getting the search results: ' + ( error || body && body.error && body.error.info ) );
+				console.log( '- ' + response.statusCode + ': Error while getting the search results: ' + ( body && body.error && body.error.info ) );
 				bot.say( channel, 'I got an error while searching: ' + wiki.toLink(( title ? 'Special:Search' : '' ), ( title ? 'search=' + title.toSearch() : '' )) );
 			}
 		}
@@ -414,12 +449,12 @@ function bot_link(channel, title, wiki) {
 					if ( wiki.isFandom() ) {
 						if ( querypage.ns === 1201 ) {
 							var thread = querypage.title.split(':');
-							request( {
-								uri: wiki + 'api.php?action=query&pageids=' + thread.slice(1).join(':') + '&format=json',
-								json: true
-							}, function( therror, thresponse, thbody ) {
-								if ( therror || !thresponse || thresponse.statusCode !== 200 || !thbody || !thbody.query || !thbody.query.pages ) {
-									console.log( '- ' + ( thresponse && thresponse.statusCode ) + ': Error while getting the thread: ' + ( therror || thbody && thbody.error && thbody.error.info ) );
+							got.get( wiki + 'api.php?action=query&pageids=' + thread.slice(1).join(':') + '&format=json', {
+								responseType: 'json'
+							} ).then( thresponse => {
+								var thbody = thresponse.body;
+								if ( thresponse.statusCode !== 200 || !thbody || !thbody.query || !thbody.query.pages ) {
+									console.log( '- ' + thresponse.statusCode + ': Error while getting the thread: ' + ( thbody && thbody.error && thbody.error.info ) );
 									bot.say( channel, 'I got an error while searching: ' + wiki.toLink(querypage.title, '', '', body) );
 								}
 								else {
@@ -429,11 +464,10 @@ function bot_link(channel, title, wiki) {
 									}
 									else {
 										var text = wiki.toLink(thread.join(':'), '', '', body);
-										request( {
-											uri: wiki.toDescLink(querypage.title)
-										}, function( descerror, descresponse, descbody ) {
-											if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
-												console.log( '- ' + ( descresponse && descresponse.statusCode ) + ': Error while getting the description: ' + descerror );
+										got.get( wiki.toDescLink(querypage.title) ).then( descresponse => {
+											var descbody = descresponse.body;
+											if ( descresponse.statusCode !== 200 || !descbody ) {
+												console.log( '- ' + descresponse.statusCode + ': Error while getting the description!' );
 											} else {
 												var parser = new htmlparser.Parser( {
 													onopentag: (tagname, attribs) => {
@@ -444,21 +478,27 @@ function bot_link(channel, title, wiki) {
 												parser.end();
 											}
 											bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+										}, descerror => {
+											console.log( '- Error while getting the description: ' + descerror );
+											bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 										} );
 									}
 								}
+							}, therror => {
+								console.log( '- Error while getting the thread: ' + therror );
+								bot.say( channel, 'I got an error while searching: ' + wiki.toLink(querypage.title, '', '', body) );
 							} );
 						}
-						else request( {
-							uri: wiki + 'api/v1/Search/List?minArticleQuality=0&namespaces=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=10&query=' + encodeURIComponent( title ) + '&format=json',
-							json: true
-						}, function( wserror, wsresponse, wsbody ) {
-							if ( wserror || !wsresponse || wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.total || !wsbody.items || !wsbody.items.length ) {
+						else got.get( wiki + 'api/v1/Search/List?minArticleQuality=0&namespaces=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=10&query=' + encodeURIComponent( title ) + '&format=json', {
+							responseType: 'json'
+						} ).then( wsresponse => {
+							var wsbody = wsresponse.body;
+							if ( wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.total || !wsbody.items || !wsbody.items.length ) {
 								if ( wsbody && ( !wsbody.total || ( wsbody.items && !wsbody.items.length ) || ( wsbody.exception && wsbody.exception.code === 404 ) ) ) {
 									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
 								}
 								else {
-									console.log( '- ' + ( wsresponse && wsresponse.statusCode ) + ': Error while getting the search results: ' + ( wserror || wsbody && wsbody.exception && wsbody.exception.details ) );
+									console.log( '- ' + wsresponse.statusCode + ': Error while getting the search results: ' + ( wsbody && wsbody.exception && wsbody.exception.details ) );
 									bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body) );
 								}
 							}
@@ -482,11 +522,10 @@ function bot_link(channel, title, wiki) {
 										text += ' – ' + body.query.allmessages[0]['*'];
 										bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 								}
-								else request( {
-									uri: wiki.toDescLink(querypage.title)
-								}, function( descerror, descresponse, descbody ) {
-									if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
-										console.log( '- ' + ( descresponse && descresponse.statusCode ) + ': Error while getting the description: ' + descerror );
+								else got.get( wiki.toDescLink(querypage.title) ).then( descresponse => {
+									var descbody = descresponse.body;
+									if ( descresponse.statusCode !== 200 || !descbody ) {
+										console.log( '- ' + descresponse.statusCode + ': Error while getting the description!' );
 									} else {
 										var parser = new htmlparser.Parser( {
 											onopentag: (tagname, attribs) => {
@@ -497,17 +536,23 @@ function bot_link(channel, title, wiki) {
 										parser.end();
 									}
 									bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+								}, descerror => {
+									console.log( '- Error while getting the description: ' + descerror );
+									bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 								} );
 							}
+						}, wserror => {
+							console.log( '- Error while getting the search results: ' + wserror );
+							bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body) );
 						} );
 					}
 					else {
-						request( {
-							uri: wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrlimit=1&gsrsearch=' + encodeURIComponent( title ) + '&format=json',
-							json: true
-						}, function( srerror, srresponse, srbody ) {
-							if ( srerror || !srresponse || srresponse.statusCode !== 200 || !srbody ) {
-								console.log( '- ' + ( srresponse && srresponse.statusCode ) + ': Error while getting the search results: ' + ( srerror || srbody && srbody.error && srbody.error.info ) );
+						got.get( wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrlimit=1&gsrsearch=' + encodeURIComponent( title ) + '&format=json', {
+							responseType: 'json'
+						} ).then( srresponse => {
+							var srbody = srresponse.body;
+							if ( srresponse.statusCode !== 200 || !srbody ) {
+								console.log( '- ' + srresponse.statusCode + ': Error while getting the search results: ' + ( srbody && srbody.error && srbody.error.info ) );
 								bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body) );
 							}
 							else {
@@ -540,6 +585,9 @@ function bot_link(channel, title, wiki) {
 									bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 								}
 							}
+						}, srerror => {
+							console.log( '- Error while getting the search results: ' + srerror );
+							bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body) );
 						} );
 					}
 				}
@@ -558,11 +606,10 @@ function bot_link(channel, title, wiki) {
 					else if ( querypage.title === body.query.general.mainpage && body.query.allmessages[0]['*'] ) {
 						text += ' – ' + body.query.allmessages[0]['*'];
 					}
-					if ( !text.includes( ' – ' ) && wiki.isFandom() ) request( {
-						uri: wiki.toDescLink(querypage.title)
-					}, function( descerror, descresponse, descbody ) {
-						if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
-							console.log( '- ' + ( descresponse && descresponse.statusCode ) + ': Error while getting the description: ' + descerror );
+					if ( !text.includes( ' – ' ) && wiki.isFandom() ) got.get( wiki.toDescLink(querypage.title) ).then( descresponse => {
+						var descbody = descresponse.body;
+						if ( descresponse.statusCode !== 200 || !descbody ) {
+							console.log( '- ' + descresponse.statusCode + ': Error while getting the description!' );
 						} else {
 							var parser = new htmlparser.Parser( {
 								onopentag: (tagname, attribs) => {
@@ -572,6 +619,9 @@ function bot_link(channel, title, wiki) {
 							parser.write( descbody );
 							parser.end();
 						}
+						bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+					}, descerror => {
+						console.log( '- Error while getting the description: ' + descerror );
 						bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 					} );
 					else bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
@@ -598,11 +648,10 @@ function bot_link(channel, title, wiki) {
 					text += ' – ' + body.query.allmessages[0]['*'];
 					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				}
-				else if ( wiki.isFandom() ) request( {
-					uri: wiki.toDescLink(body.query.general.mainpage)
-				}, function( descerror, descresponse, descbody ) {
-					if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
-						console.log( '- ' + ( descresponse && descresponse.statusCode ) + ': Error while getting the description: ' + descerror );
+				else if ( wiki.isFandom() ) got.get( wiki.toDescLink(body.query.general.mainpage) ).then( descresponse => {
+					var descbody = descresponse.body;
+					if ( descresponse.statusCode !== 200 || !descbody ) {
+						console.log( '- ' + descresponse.statusCode + ': Error while getting the description!' );
 					} else {
 						var parser = new htmlparser.Parser( {
 							onopentag: (tagname, attribs) => {
@@ -613,13 +662,16 @@ function bot_link(channel, title, wiki) {
 						parser.end();
 					}
 					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+				}, descerror => {
+					console.log( '- Error while getting the description: ' + descerror );
+					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				} );
-				else request( {
-					uri: wiki + 'api.php?action=query&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json',
-					json: true
-				}, function( mperror, mpresponse, mpbody ) {
-					if ( mperror || !mpresponse || mpresponse.statusCode !== 200 || !mpbody || !mpbody.query ) {
-						console.log( '- ' + ( mpresponse && mpresponse.statusCode ) + ': Error while getting the main page: ' + ( mperror || mpbody && mpbody.error && mpbody.error.info ) );
+				else got.get( wiki + 'api.php?action=query&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json', {
+					responseType: 'json'
+				} ).then( mpresponse => {
+					var mpbody = mpresponse.body;
+					if ( mpresponse.statusCode !== 200 || !mpbody || !mpbody.query ) {
+						console.log( '- ' + mpresponse.statusCode + ': Error while getting the main page: ' + ( mpbody && mpbody.error && mpbody.error.info ) );
 					} else {
 						querypage = Object.values(mpbody.query.pages)[0];
 						if ( querypage.pageprops && querypage.pageprops.description ) {
@@ -634,24 +686,36 @@ function bot_link(channel, title, wiki) {
 						else if ( querypage.extract ) text += ' – ' + querypage.extract;
 					}
 					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+				}, mperror => {
+					console.log( '- Error while getting the main page: ' + mperror );
+					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				} );
 			}
+		}
+	}, error => {
+		if ( wiki.noWiki(error.message) ) {
+			console.log( '- This wiki doesn\'t exist!' );
+			bot.say( channel, 'This wiki does not exist!' );
+		}
+		else {
+			console.log( '- Error while getting the search results: ' + error );
+			bot.say( channel, 'I got an error while searching: ' + wiki.toLink(( title ? 'Special:Search' : '' ), ( title ? 'search=' + title.toSearch() : '' )) );
 		}
 	} );
 }
 
 function bot_random(channel, wiki) {
-	request( {
-		uri: wiki + 'api.php?action=query&meta=allmessages|siteinfo&ammessages=description&amenableparser=true&siprop=general&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=random&grnnamespace=0&format=json',
-		json: true
-	}, function( error, response, body ) {
-		if ( error || !response || response.statusCode !== 200 || !body || !body.query || !body.query.pages ) {
-			if ( response && ( response.request && response.request.uri && wiki.noWiki(response.request.uri.href) || response.statusCode === 410 ) ) {
+	got.get( wiki + 'api.php?action=query&meta=allmessages|siteinfo&ammessages=description&amenableparser=true&siprop=general&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=random&grnnamespace=0&format=json', {
+		responseType: 'json'
+	} ).then( response => {
+		var body = response.body;
+		if ( response.statusCode !== 200 || !body || !body.query || !body.query.pages ) {
+			if ( wiki.noWiki(response.url) || response.statusCode === 410 ) {
 				console.log( '- This wiki doesn\'t exist!' );
 				bot.say( channel, 'This wiki does not exist!' );
 			}
 			else {
-				console.log( '- ' + ( response && response.statusCode ) + ': Error while getting the search results: ' + ( error || body && body.error && body.error.info ) );
+				console.log( '- ' + response.statusCode + ': Error while getting the search results: ' + ( body && body.error && body.error.info ) );
 				bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Random') );
 			}
 		}
@@ -671,11 +735,10 @@ function bot_random(channel, wiki) {
 			else if ( querypage.title === body.query.general.mainpage && body.query.allmessages[0]['*'] ) text += ' – ' + body.query.allmessages[0]['*'];
 			else if ( wiki.isFandom() ) {
 				var nosend = true;
-				request( {
-					uri: wiki.toDescLink(querypage.title)
-				}, function( descerror, descresponse, descbody ) {
-					if ( descerror || !descresponse || descresponse.statusCode !== 200 || !descbody ) {
-						console.log( '- ' + ( descresponse && descresponse.statusCode ) + ': Error while getting the description: ' + descerror );
+				got.get( wiki.toDescLink(querypage.title) ).then( descresponse => {
+					var descbody = descresponse.body;
+					if ( descresponse.statusCode !== 200 || !descbody ) {
+						console.log( '- ' + descresponse.statusCode + ': Error while getting the description!' );
 					} else {
 						var parser = new htmlparser.Parser( {
 							onopentag: (tagname, attribs) => {
@@ -686,21 +749,34 @@ function bot_random(channel, wiki) {
 						parser.end();
 					}
 					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+				}, descerror => {
+					console.log( '- Error while getting the description: ' + descerror );
+					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				} );
 			}
 			
 			if ( !nosend ) bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
+		}
+	}, error => {
+		if ( wiki.noWiki(error.message) ) {
+			console.log( '- This wiki doesn\'t exist!' );
+			bot.say( channel, 'This wiki does not exist!' );
+		}
+		else {
+			console.log( '- Error while getting the search results: ' + error );
+			bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Random') );
 		}
 	} );
 }
 
 String.prototype.noWiki = function(href) {
 	if ( !href ) return false;
+	else if ( this.startsWith( 'https://www.' ) ) return true;
 	else if ( this.endsWith( '.gamepedia.com/' ) ) return 'https://www.gamepedia.com/' === href;
 	else return [
 		this.replace( /^https:\/\/([a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org))\/(?:[a-z-]{1,8}\/)?$/, 'https://community.fandom.com/wiki/Community_Central:Not_a_valid_community?from=$1' ),
 		this + 'language-wikis'
-	].includes( href );
+	].includes( href.replace( /Unexpected token < in JSON at position 0 in "([^ ]+)"/, '$1' ) );
 };
 
 String.prototype.isFandom = function() {
@@ -805,17 +881,17 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 				}
 				count++;
 			}
-			if ( links.length ) request( {
-				uri: wiki + 'api.php?action=query&iwurl=true&titles=' + encodeURIComponent( links.map( link => link.title ).join('|') ) + '&format=json',
-				json: true
-			}, function( error, response, body ) {
-				if ( error || !response || response.statusCode !== 200 || !body || !body.query ) {
-					if ( response && ( response.request && response.request.uri && wiki.noWiki(response.request.uri.href) || response.statusCode === 410 ) ) {
+			if ( links.length ) got.get( wiki + 'api.php?action=query&iwurl=true&titles=' + encodeURIComponent( links.map( link => link.title ).join('|') ) + '&format=json', {
+				responseType: 'json'
+			} ).then( response => {
+				var body = response.body;
+				if ( response.statusCode !== 200 || !body || !body.query ) {
+					if ( wiki.noWiki(response.url) || response.statusCode === 410 ) {
 						console.log( '- This wiki doesn\'t exist!' );
 						bot.say( channel, 'This wiki does not exist!' );
 						return;
 					}
-					console.log( '- ' + ( response && response.statusCode ) + ': Error while following the links: ' + ( error || body && body.error && body.error.info ) );
+					console.log( '- ' + response.statusCode + ': Error while following the links: ' + ( body && body.error && body.error.info ) );
 					return;
 				}
 				if ( body.query.normalized ) {
@@ -840,6 +916,13 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 					var messages = links.map( link => ( link.url || wiki.toLink() + link.title.toTitle() + ( link.section ? '#' + link.section.toSection() : '' ) ) ).join(' – ').splitText(450, ' – ');
 					messages.forEach( message => bot.say( channel, message ) );
 				}
+			}, error => {
+				if ( wiki.noWiki(error.message) ) {
+					console.log( '- This wiki doesn\'t exist!' );
+					bot.say( channel, 'This wiki does not exist!' );
+					return;
+				}
+				console.log( '- Error while following the links: ' + error );
 			} );
 			
 			regex = new RegExp( '(?<!\\\\)(?<!\\{)\\{\\{([^' + "<>\\[\\]\\|{}\\x01-\\x1F\\x7F" + ']+)(?<!\\\\)\\}\\}', 'g' );
@@ -858,17 +941,17 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 				}
 				count++;
 			}
-			if ( embeds.length ) request( {
-				uri: wiki + 'api.php?action=query&titles=' + encodeURIComponent( embeds.map( embed => embed.title ).join('|') ) + '&format=json',
-				json: true
-			}, function( error, response, body ) {
-				if ( error || !response || response.statusCode !== 200 || !body || !body.query ) {
-					if ( response && ( response.request && response.request.uri && wiki.noWiki(response.request.uri.href) || response.statusCode === 410 ) ) {
+			if ( embeds.length ) got.get( wiki + 'api.php?action=query&titles=' + encodeURIComponent( embeds.map( embed => embed.title ).join('|') ) + '&format=json', {
+				responseType: 'json'
+			} ).then( response => {
+				var body = response.body;
+				if ( response.statusCode !== 200 || !body || !body.query ) {
+					if ( wiki.noWiki(response.url) || response.statusCode === 410 ) {
 						console.log( '- This wiki doesn\'t exist!' );
 						bot.say( channel, 'This wiki does not exist!' );
 						return;
 					}
-					console.log( '- ' + ( response && response.statusCode ) + ': Error while following the links: ' + ( error || body && body.error && body.error.info ) );
+					console.log( '- ' + response.statusCode + ': Error while following the links: ' + ( body && body.error && body.error.info ) );
 					return;
 				}
 				if ( body.query.normalized ) {
@@ -886,6 +969,13 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 					} ) );
 				}
 				if ( embeds.length ) embeds.forEach( embed => bot_link(channel, embed.title + embed.section, wiki) );
+			}, error => {
+				if ( wiki.noWiki(error.message) ) {
+					console.log( '- This wiki doesn\'t exist!' );
+					bot.say( channel, 'This wiki does not exist!' );
+					return;
+				}
+				console.log( '- Error while following the links: ' + error );
 			} );
 		}
 	} );
@@ -927,13 +1017,13 @@ function checkGames(channels, mention) {
 		checkGames(channels.slice(100), mention);
 		channels = channels.slice(0, 100);
 	}
-	if ( channels.length ) request( {
-		uri: 'https://api.twitch.tv/kraken/channels?id=' + channels.map( channel => channel.id ).join(','),
+	if ( channels.length ) got.get( 'https://api.twitch.tv/kraken/channels?id=' + channels.map( channel => channel.id ).join(','), {
 		headers: kraken,
-		json: true
-	}, function( error, response, body ) {
-		if ( error || !response || response.statusCode !== 200 || !body || body.error || !body.channels ) {
-			console.log( '- ' + ( response && response.statusCode ) + ': Error while checking games: ' + ( error || body && ( body.message || body.error ) ) );
+		responseType: 'json'
+	} ).then( response => {
+		var body = response.body;
+		if ( response.statusCode !== 200 || !body || body.error || !body.channels ) {
+			console.log( '- ' + response.statusCode + ': Error while checking games: ' + ( body && ( body.message || body.error ) ) );
 			if ( mention ) bot.say( mention[0], 'gamepediaWIKIBOT @' + mention[1] + ', I couldn\'t start changing the default wiki automatically :(' );
 		}
 		else {
@@ -952,12 +1042,12 @@ function checkGames(channels, mention) {
 							channel.wiki = 'https://' + wiki.wiki_domain + '/';
 							saveCheckedGames(channel, mention);
 						}
-						else request( {
-							uri: 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json',
-							json: true
-						}, function( wserror, wsresponse, wsbody ) {
-							if ( wserror || !wsresponse || wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.items ) {
-								console.log( '- ' + ( wsresponse && wsresponse.statusCode ) + ': Error while getting the wiki results: ' + ( wserror || wsbody && wsbody.exception && wsbody.exception.details ) );
+						else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json', {
+							responseType: 'json'
+						} ).then( wsresponse => {
+							var wsbody = wsresponse.body;
+							if ( wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.items ) {
+								console.log( '- ' + wsresponse.statusCode + ': Error while getting the wiki results: ' + ( wsbody && wsbody.exception && wsbody.exception.details ) );
 								channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';
 								saveCheckedGames(channel, mention);
 							}
@@ -979,12 +1069,12 @@ function checkGames(channels, mention) {
 											channel.wiki = 'https://' + wiki.wiki_domain + '/';
 											saveCheckedGames(channel, mention);
 										}
-										else request( {
-											uri: 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json',
-											json: true
-										}, function( ws2error, ws2response, ws2body ) {
-											if ( ws2error || !ws2response || ws2response.statusCode !== 200 || !ws2body || ws2body.exception || !ws2body.items ) {
-												console.log( '- ' + ( ws2response && ws2response.statusCode ) + ': Error while getting the wiki results: ' + ( ws2error || ws2body && ws2body.exception && ws2body.exception.details ) );
+										else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json', {
+											responseType: 'json'
+										} ).then( ws2response => {
+											var ws2body = ws2response.body;
+											if ( ws2response.statusCode !== 200 || !ws2body || ws2body.exception || !ws2body.items ) {
+												console.log( '- ' + ws2response.statusCode + ': Error while getting the wiki results: ' + ( ws2body && ws2body.exception && ws2body.exception.details ) );
 												channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';
 											}
 											else {
@@ -992,6 +1082,10 @@ function checkGames(channels, mention) {
 												if ( wiki ) channel.wiki = wiki.url + '/';
 												else channel.text = 'I couldn\'t find a wiki for "' + channel.game + '", I kept the current default wiki.';
 											}
+											saveCheckedGames(channel, mention);
+										}, ws2error => {
+											console.log( '- Error while getting the wiki results: ' + ws2error );
+											channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';
 											saveCheckedGames(channel, mention);
 										} );
 									}
@@ -1001,6 +1095,10 @@ function checkGames(channels, mention) {
 									saveCheckedGames(channel, mention);
 								}
 							}
+						}, wserror => {
+							console.log( '- Error while getting the wiki results: ' + wserror );
+							channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';
+							saveCheckedGames(channel, mention);
 						} );
 					}
 				}
@@ -1010,6 +1108,9 @@ function checkGames(channels, mention) {
 				}
 			} );
 		}
+	}, error => {
+		console.log( '- Error while checking games: ' + error );
+		if ( mention ) bot.say( mention[0], 'gamepediaWIKIBOT @' + mention[1] + ', I couldn\'t start changing the default wiki automatically :(' );
 	} );
 }
 
