@@ -176,7 +176,7 @@ function checkChannels(channels) {
 var allSites = [];
 
 function getAllSites() {
-	got.get( 'https://help.gamepedia.com/api.php?action=allsites&formatversion=2&do=getSiteStats&filter=wikis|wiki_domain,wiki_display_name,wiki_managers,official_wiki,created,ss_good_articles&format=json', {
+	got.get( 'https://help.gamepedia.com/api.php?action=allsites&formatversion=2&do=getSiteStats&filter=wikis|wiki_domain,wiki_display_name,wiki_managers,official_wiki,wiki_crossover,ss_good_articles&format=json', {
 		responseType: 'json'
 	} ).then( response => {
 		var body = response.body;
@@ -186,6 +186,7 @@ function getAllSites() {
 		else {
 			console.log( '- Sites successfully loaded.' );
 			allSites = JSON.parse(JSON.stringify(body.data.wikis.filter( site => /^[a-z\d-]{1,50}\.gamepedia\.com$/.test(site.wiki_domain) )));
+			allSites.filter( site => site.wiki_crossover ).forEach( site => site.wiki_crossover = site.wiki_crossover.replace( /^(?:https?:)?\/\/(([a-z\d-]{1,50})\.(?:fandom\.com|wikia\.org)(?:(?!\/wiki\/)\/([a-z-]{1,8}))?).*/, '$1' ) );
 		}
 	}, error => {
 			console.log( '- Error while gettings all sites: ' + error );
@@ -246,54 +247,60 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 				if ( wiki === wikinew && !forced ) {
 					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', the default wiki is already set to: ' + wiki );
 				}
-				else got.get( wikinew + 'api.php?action=query&format=json', {
-					responseType: 'json'
-				} ).then( response => {
-					var body = response.body;
-					if ( response.statusCode !== 200 || !body || !( body instanceof Object ) ) {
-						if ( forced || wikinew.noWiki(response.url) || response.statusCode === 410 ) {
+				else {
+					if ( wikinew.endsWith( '.gamepedia.com/' ) && !forced ) {
+						let site = allSites.find( site => site.wiki_domain === wikinew.replace( /^https:\/\/([a-z\d-]{1,50}\.gamepedia\.com)\/$/, '$1' ) );
+						if ( site ) wikinew = 'https://' + ( site.wiki_crossover || site.wiki_domain ) + '/';
+					}
+					got.get( wikinew + 'api.php?action=query&format=json', {
+						responseType: 'json'
+					} ).then( response => {
+						var body = response.body;
+						if ( response.statusCode !== 200 || !body || !( body instanceof Object ) ) {
+							if ( forced || wikinew.noWiki(response.url) || response.statusCode === 410 ) {
+								console.log( '- This wiki doesn\'t exist!' );
+								bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
+								var nowiki = true;
+							}
+							else {
+								console.log( '- ' + response.statusCode + ': Error while reaching the wiki: ' + ( body && body.error && body.error.info ) );
+								comment = ' I got an error while checking if the wiki exists!';
+							}
+						}
+						if ( !nowiki ) {
+							db.run( 'UPDATE twitch SET wiki = ? WHERE id = ?', [wikinew, userstate['room-id']], function (dberror) {
+								if ( dberror ) {
+									console.log( '- Error while editing the settings: ' + dberror );
+									bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
+									return dberror;
+								}
+								console.log( '- Settings successfully updated.' );
+								bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced || 'changed' ) + ' the default wiki to: ' + wikinew + comment );
+							} );
+						}
+					}, error => {
+						if ( forced || wikinew.noWiki(error.message) ) {
 							console.log( '- This wiki doesn\'t exist!' );
 							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
 							var nowiki = true;
 						}
 						else {
-							console.log( '- ' + response.statusCode + ': Error while reaching the wiki: ' + ( body && body.error && body.error.info ) );
+							console.log( '- Error while reaching the wiki: ' + error );
 							comment = ' I got an error while checking if the wiki exists!';
 						}
-					}
-					if ( !nowiki ) {
-						db.run( 'UPDATE twitch SET wiki = ? WHERE id = ?', [wikinew, userstate['room-id']], function (dberror) {
-							if ( dberror ) {
-								console.log( '- Error while editing the settings: ' + dberror );
-								bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
-								return dberror;
-							}
-							console.log( '- Settings successfully updated.' );
-							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced || 'changed' ) + ' the default wiki to: ' + wikinew + comment );
-						} );
-					}
-				}, error => {
-					if ( forced || wikinew.noWiki(error.message) ) {
-						console.log( '- This wiki doesn\'t exist!' );
-						bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
-						var nowiki = true;
-					}
-					else {
-						console.log( '- Error while reaching the wiki: ' + error );
-						comment = ' I got an error while checking if the wiki exists!';
-					}
-					if ( !nowiki ) {
-						db.run( 'UPDATE twitch SET wiki = ? WHERE id = ?', [wikinew, userstate['room-id']], function (dberror) {
-							if ( dberror ) {
-								console.log( '- Error while editing the settings: ' + dberror );
-								bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
-								return dberror;
-							}
-							console.log( '- Settings successfully updated.' );
-							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced || 'changed' ) + ' the default wiki to: ' + wikinew + comment );
-						} );
-					}
-				} );
+						if ( !nowiki ) {
+							db.run( 'UPDATE twitch SET wiki = ? WHERE id = ?', [wikinew, userstate['room-id']], function (dberror) {
+								if ( dberror ) {
+									console.log( '- Error while editing the settings: ' + dberror );
+									bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
+									return dberror;
+								}
+								console.log( '- Settings successfully updated.' );
+								bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced || 'changed' ) + ' the default wiki to: ' + wikinew + comment );
+							} );
+						}
+					} );
+				}
 			}
 			else {
 				bot_link(channel, msg.split(' ').slice(1).join(' '), wiki);
@@ -1032,14 +1039,15 @@ function checkGames(channels, mention) {
 				var game = channel.game;
 				if ( game ) {
 					channel.text = 'I automatically changed the default wiki to: ';
-					if ( allSites.some( site => site.wiki_domain === game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' && ( site.ss_good_articles >= 100 || site.official_wiki ) ) ) {
-						channel.wiki = 'https://' + game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com/';
+					var wiki = allSites.find( site => site.wiki_domain === game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' && ( site.ss_good_articles >= 100 || site.official_wiki || site.wiki_crossover ) );
+					if ( wiki ) {
+						channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
 						saveCheckedGames(channel, mention);
 					}
 					else {
-						var wiki = allSites.find( site => site.wiki_display_name === game + ' Wiki (EN)' && ( site.ss_good_articles >= 100 || site.official_wiki ) );
+						wiki = allSites.find( site => site.wiki_display_name === game + ' Wiki (EN)' && ( site.ss_good_articles >= 100 || site.official_wiki || site.wiki_crossover ) );
 						if ( wiki ) {
-							channel.wiki = 'https://' + wiki.wiki_domain + '/';
+							channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
 							saveCheckedGames(channel, mention);
 						}
 						else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json', {
@@ -1059,14 +1067,15 @@ function checkGames(channels, mention) {
 								}
 								else if ( /(?: \d{1,2}| [IV]{1,3}|: .+)$/.test(game) ) {
 									game = game.replace( /(?: \d{1,2}| [IV]{1,3}|: .+)$/, '' );
-									if ( allSites.some( site => site.wiki_domain === game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' && ( site.ss_good_articles >= 100 || site.official_wiki ) ) ) {
-										channel.wiki = 'https://' + game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com/';
+									wiki = allSites.find( site => site.wiki_domain === game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' && ( site.ss_good_articles >= 100 || site.official_wiki || site.wiki_crossover ) );
+									if ( wiki ) {
+										channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
 										saveCheckedGames(channel, mention);
 									}
 									else {
-										wiki = allSites.find( site => site.wiki_display_name === game + ' Wiki (EN)' && ( site.ss_good_articles >= 100 || site.official_wiki ) );
+										wiki = allSites.find( site => site.wiki_display_name === game + ' Wiki (EN)' && ( site.ss_good_articles >= 100 || site.official_wiki || site.wiki_crossover ) );
 										if ( wiki ) {
-											channel.wiki = 'https://' + wiki.wiki_domain + '/';
+											channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
 											saveCheckedGames(channel, mention);
 										}
 										else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json', {
