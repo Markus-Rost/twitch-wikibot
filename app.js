@@ -7,6 +7,7 @@ var isDebug = ( process.argv[2] === 'debug' );
 const tmi = require('tmi.js');
 const got = require('got').extend( {
 	throwHttpErrors: false,
+	timeout: 5000,
 	headers: {
 		'user-agent': 'WikiBot/' + ( isDebug ? 'testing' : process.env.npm_package_version ) + ' (Twitch; ' + process.env.npm_package_name + ')'
 	}
@@ -260,35 +261,22 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 							if ( forced || wikinew.noWiki(response.url) || response.statusCode === 410 ) {
 								console.log( '- This wiki doesn\'t exist!' );
 								bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
-								var nowiki = true;
+								return false;
 							}
-							else {
-								console.log( '- ' + response.statusCode + ': Error while reaching the wiki: ' + ( body && body.error && body.error.info ) );
-								comment = ' I got an error while checking if the wiki exists!';
-							}
-						}
-						if ( !nowiki ) {
-							db.run( 'UPDATE twitch SET wiki = ? WHERE id = ?', [wikinew, userstate['room-id']], function (dberror) {
-								if ( dberror ) {
-									console.log( '- Error while editing the settings: ' + dberror );
-									bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t change the default wiki :(' );
-									return dberror;
-								}
-								console.log( '- Settings successfully updated.' );
-								bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I ' + ( forced || 'changed' ) + ' the default wiki to: ' + wikinew + comment );
-							} );
+							console.log( '- ' + response.statusCode + ': Error while reaching the wiki: ' + ( body && body.error && body.error.info ) );
+							comment = ' I got an error while checking if the wiki exists!';
 						}
 					}, error => {
 						if ( forced || wikinew.noWiki(error.message) ) {
 							console.log( '- This wiki doesn\'t exist!' );
 							bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
-							var nowiki = true;
+							return false;
 						}
-						else {
-							console.log( '- Error while reaching the wiki: ' + error );
-							comment = ' I got an error while checking if the wiki exists!';
-						}
-						if ( !nowiki ) {
+						console.log( '- Error while reaching the wiki: ' + error );
+						comment = ' I got an error while checking if the wiki exists!';
+						return true;
+					} ).then( checkwiki => {
+						if ( checkwiki ) {
 							db.run( 'UPDATE twitch SET wiki = ? WHERE id = ?', [wikinew, userstate['room-id']], function (dberror) {
 								if ( dberror ) {
 									console.log( '- Error while editing the settings: ' + dberror );
@@ -462,7 +450,7 @@ function bot_link(channel, title, wiki) {
 								var thbody = thresponse.body;
 								if ( thresponse.statusCode !== 200 || !thbody || !thbody.query || !thbody.query.pages ) {
 									console.log( '- ' + thresponse.statusCode + ': Error while getting the thread: ' + ( thbody && thbody.error && thbody.error.info ) );
-									bot.say( channel, 'I got an error while searching: ' + wiki.toLink(querypage.title, '', '', body) );
+									bot.say( channel, 'I got an error while searching: ' + wiki.toLink(querypage.title, '', '', body.query.general) );
 								}
 								else {
 									querypage = thbody.query.pages[thread.slice(1).join(':')];
@@ -470,11 +458,11 @@ function bot_link(channel, title, wiki) {
 										bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
 									}
 									else {
-										var text = wiki.toLink(thread.join(':'), '', '', body);
+										var text = wiki.toLink(thread.join(':'), '', '', body.query.general);
 										got.get( wiki.toDescLink(querypage.title) ).then( descresponse => {
 											var descbody = descresponse.body;
 											if ( descresponse.statusCode !== 200 || !descbody ) {
-												console.log( '- ' + descresponse.statusCode + ': Error while getting the description!' );
+												console.log( '- ' + descresponse.statusCode + ': Error while getting the description.' );
 											} else {
 												var parser = new htmlparser.Parser( {
 													onopentag: (tagname, attribs) => {
@@ -493,10 +481,10 @@ function bot_link(channel, title, wiki) {
 								}
 							}, therror => {
 								console.log( '- Error while getting the thread: ' + therror );
-								bot.say( channel, 'I got an error while searching: ' + wiki.toLink(querypage.title, '', '', body) );
+								bot.say( channel, 'I got an error while searching: ' + wiki.toLink(querypage.title, '', '', body.query.general) );
 							} );
 						}
-						else got.get( wiki + 'api/v1/Search/List?minArticleQuality=0&namespaces=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=10&query=' + encodeURIComponent( title ) + '&format=json', {
+						else got.get( wiki + 'api/v1/Search/List?minArticleQuality=0&namespaces=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=1&query=' + encodeURIComponent( title ) + '&format=json', {
 							responseType: 'json'
 						} ).then( wsresponse => {
 							var wsbody = wsresponse.body;
@@ -506,7 +494,7 @@ function bot_link(channel, title, wiki) {
 								}
 								else {
 									console.log( '- ' + wsresponse.statusCode + ': Error while getting the search results: ' + ( wsbody && wsbody.exception && wsbody.exception.details ) );
-									bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body) );
+									bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body.query.general) );
 								}
 							}
 							else {
@@ -524,7 +512,7 @@ function bot_link(channel, title, wiki) {
 								else {
 									text = 'I found this for you: ';
 								}
-								text += wiki.toLink(querypage.title, '', '', body);
+								text += wiki.toLink(querypage.title, '', '', body.query.general);
 								if ( querypage.title === body.query.general.mainpage && body.query.allmessages[0]['*'] ) {
 										text += ' – ' + body.query.allmessages[0]['*'];
 										bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
@@ -532,7 +520,7 @@ function bot_link(channel, title, wiki) {
 								else got.get( wiki.toDescLink(querypage.title) ).then( descresponse => {
 									var descbody = descresponse.body;
 									if ( descresponse.statusCode !== 200 || !descbody ) {
-										console.log( '- ' + descresponse.statusCode + ': Error while getting the description!' );
+										console.log( '- ' + descresponse.statusCode + ': Error while getting the description.' );
 									} else {
 										var parser = new htmlparser.Parser( {
 											onopentag: (tagname, attribs) => {
@@ -550,7 +538,7 @@ function bot_link(channel, title, wiki) {
 							}
 						}, wserror => {
 							console.log( '- Error while getting the search results: ' + wserror );
-							bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body) );
+							bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body.query.general) );
 						} );
 					}
 					else {
@@ -560,7 +548,7 @@ function bot_link(channel, title, wiki) {
 							var srbody = srresponse.body;
 							if ( srresponse.statusCode !== 200 || !srbody ) {
 								console.log( '- ' + srresponse.statusCode + ': Error while getting the search results: ' + ( srbody && srbody.error && srbody.error.info ) );
-								bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body) );
+								bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body.query.general) );
 							}
 							else {
 								if ( !srbody.query ) {
@@ -578,7 +566,7 @@ function bot_link(channel, title, wiki) {
 									else {
 										text = 'I found this for you: ';
 									}
-									text += wiki.toLink(querypage.title, '', '', body);
+									text += wiki.toLink(querypage.title, '', '', body.query.general);
 									if ( querypage.pageprops && querypage.pageprops.description ) {
 										var parser = new htmlparser.Parser( {
 											ontext: (htmltext) => {
@@ -594,12 +582,12 @@ function bot_link(channel, title, wiki) {
 							}
 						}, srerror => {
 							console.log( '- Error while getting the search results: ' + srerror );
-							bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body) );
+							bot.say( channel, 'I got an error while searching: ' + wiki.toLink('Special:Search', 'search=' + title.toSearch(), '', body.query.general) );
 						} );
 					}
 				}
 				else {
-					var text = wiki.toLink(querypage.title, '', ( body.query.redirects ? body.query.redirects[0].tofragment : '' ), body);
+					var text = wiki.toLink(querypage.title, '', ( body.query.redirects ? body.query.redirects[0].tofragment : '' ), body.query.general);
 					if ( querypage.pageprops && querypage.pageprops.description ) {
 						var parser = new htmlparser.Parser( {
 							ontext: (htmltext) => {
@@ -616,7 +604,7 @@ function bot_link(channel, title, wiki) {
 					if ( !text.includes( ' – ' ) && wiki.isFandom() ) got.get( wiki.toDescLink(querypage.title) ).then( descresponse => {
 						var descbody = descresponse.body;
 						if ( descresponse.statusCode !== 200 || !descbody ) {
-							console.log( '- ' + descresponse.statusCode + ': Error while getting the description!' );
+							console.log( '- ' + descresponse.statusCode + ': Error while getting the description.' );
 						} else {
 							var parser = new htmlparser.Parser( {
 								onopentag: (tagname, attribs) => {
@@ -650,7 +638,7 @@ function bot_link(channel, title, wiki) {
 				}
 			}
 			else {
-				var text = wiki.toLink(body.query.general.mainpage, '', '', body);
+				var text = wiki.toLink(body.query.general.mainpage, '', '', body.query.general);
 				if ( body.query.allmessages[0]['*'] ) {
 					text += ' – ' + body.query.allmessages[0]['*'];
 					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
@@ -658,7 +646,7 @@ function bot_link(channel, title, wiki) {
 				else if ( wiki.isFandom() ) got.get( wiki.toDescLink(body.query.general.mainpage) ).then( descresponse => {
 					var descbody = descresponse.body;
 					if ( descresponse.statusCode !== 200 || !descbody ) {
-						console.log( '- ' + descresponse.statusCode + ': Error while getting the description!' );
+						console.log( '- ' + descresponse.statusCode + ': Error while getting the description.' );
 					} else {
 						var parser = new htmlparser.Parser( {
 							onopentag: (tagname, attribs) => {
@@ -728,7 +716,7 @@ function bot_random(channel, wiki) {
 		}
 		else {
 			var querypage = Object.values(body.query.pages)[0];
-			var text = '🎲 ' + wiki.toLink(querypage.title, '', '', body);
+			var text = '🎲 ' + wiki.toLink(querypage.title, '', '', body.query.general);
 			if ( querypage.pageprops && querypage.pageprops.description ) {
 				var parser = new htmlparser.Parser( {
 					ontext: (htmltext) => {
@@ -745,7 +733,7 @@ function bot_random(channel, wiki) {
 				got.get( wiki.toDescLink(querypage.title) ).then( descresponse => {
 					var descbody = descresponse.body;
 					if ( descresponse.statusCode !== 200 || !descbody ) {
-						console.log( '- ' + descresponse.statusCode + ': Error while getting the description!' );
+						console.log( '- ' + descresponse.statusCode + ': Error while getting the description.' );
 					} else {
 						var parser = new htmlparser.Parser( {
 							onopentag: (tagname, attribs) => {
@@ -792,9 +780,9 @@ String.prototype.isFandom = function() {
 
 String.prototype.toLink = function(title = '', querystring = '', fragment = '', path) {
 	var linksuffix = ( querystring ? '?' + querystring.toTitle(true) : '' ) + ( fragment ? '#' + fragment.toSection() : '' );
-	if ( this.endsWith( '.gamepedia.com/' ) ) return this + title.toTitle() + linksuffix;
+	if ( path ) return ( path.server.startsWith( '//' ) ? 'https:' : '' ) + path.server + path.articlepath.replaceSave( '$1', title.toTitle() ) + ( path.articlepath.includes( '?' ) && linksuffix.startsWith( '?' ) ? '&' + linksuffix.substring(1) : linksuffix );
+	else if ( this.endsWith( '.gamepedia.com/' ) ) return this + title.toTitle() + linksuffix;
 	else if ( this.isFandom() ) return this + 'wiki/' + title.toTitle() + linksuffix;
-	else if ( path ) return this.substring(0, this.length - path.query.general.scriptpath.length - 1) + path.query.general.articlepath.replaceSave( '$1', title.toTitle() ) + linksuffix;
 	else return this + 'index.php?title=' + title.toTitle(true) + ( linksuffix.startsWith( '?' ) ? '&' + linksuffix.substring(1) : linksuffix );
 };
 
@@ -888,7 +876,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 				}
 				count++;
 			}
-			if ( links.length ) got.get( wiki + 'api.php?action=query&iwurl=true&titles=' + encodeURIComponent( links.map( link => link.title ).join('|') ) + '&format=json', {
+			if ( links.length ) got.get( wiki + 'api.php?action=query&meta=siteinfo&siprop=general&iwurl=true&titles=' + encodeURIComponent( links.map( link => link.title ).join('|') ) + '&format=json', {
 				responseType: 'json'
 			} ).then( response => {
 				var body = response.body;
@@ -916,11 +904,11 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 					} ) );
 					querypages.filter( page => page.missing !== undefined && page.known === undefined ).forEach( page => links.filter( link => link.title === page.title ).forEach( link => {
 						if ( ( page.ns === 2 || page.ns === 202 ) && !page.title.includes( '/' ) ) return;
-						link.url = wiki.toLink() + link.title.toTitle() + '?action=edit&redlink=1';
+						link.url = wiki.toLink(link.title, 'action=edit&redlink=1', '', body.query.general);
 					} ) );
 				}
 				if ( links.length ) {
-					var messages = links.map( link => ( link.url || wiki.toLink() + link.title.toTitle() + ( link.section ? '#' + link.section.toSection() : '' ) ) ).join(' – ').splitText(450, ' – ');
+					var messages = links.map( link => ( link.url || wiki.toLink(link.title, '', link.section, body.query.general) ) ).join(' – ').splitText(450, ' – ');
 					messages.forEach( message => bot.say( channel, message ) );
 				}
 			}, error => {
@@ -948,7 +936,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 				}
 				count++;
 			}
-			if ( embeds.length ) got.get( wiki + 'api.php?action=query&titles=' + encodeURIComponent( embeds.map( embed => embed.title ).join('|') ) + '&format=json', {
+			if ( embeds.length ) got.get( wiki + 'api.php?action=query&meta=siteinfo&siprop=general&titles=' + encodeURIComponent( embeds.map( embed => embed.title ).join('|') ) + '&format=json', {
 				responseType: 'json'
 			} ).then( response => {
 				var body = response.body;
@@ -971,7 +959,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 					} ) );
 					querypages.filter( page => page.missing !== undefined && page.known === undefined ).forEach( page => embeds.filter( embed => embed.title === page.title ).forEach( embed => {
 						if ( ( page.ns === 2 || page.ns === 202 ) && !page.title.includes( '/' ) ) return;
-						bot.say( channel, wiki.toLink() + embed.title.toTitle() + '?action=edit&redlink=1' );
+						bot.say( channel, wiki.toLink(embed.title, 'action=edit&redlink=1', '', body.query.general) );
 						embeds.splice(embeds.indexOf(embed), 1);
 					} ) );
 				}
