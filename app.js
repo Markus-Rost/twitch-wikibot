@@ -266,6 +266,7 @@ function bot_setwiki(channel, userstate, msg, args, wiki) {
 							console.log( '- ' + response.statusCode + ': Error while reaching the wiki: ' + ( body && body.error && body.error.info ) );
 							comment = ' I got an error while checking if the wiki exists!';
 						}
+						return true;
 					}, error => {
 						if ( forced || wikinew.noWiki(error.message) ) {
 							console.log( '- This wiki doesn\'t exist!' );
