@@ -311,6 +311,15 @@ async function bot_eval(channel, userstate, msg, args, wiki) {
 		if ( isDebug ) console.log( '--- EVAL START ---\n' + text + '\n--- EVAL END ---' );
 		if ( text.length > 450 ) bot.say( channel, 'gamepediaWIKIBOT ✅' );
 		else bot.say( channel, 'gamepediaWIKIBOT ' + text );
+		
+		function database(sql, sqlargs = []) {
+			return new Promise( function (resolve, reject) {
+				db.all( sql, sqlargs, (error, rows) => {
+					if (error) reject(error);
+					resolve(rows);
+				} );
+			} );
+		}
 	} else {
 		bot_link(channel, msg.split(' ').slice(1).join(' '), wiki);
 	}
