@@ -40,6 +40,7 @@ var bot = new tmi.client( {
 	},
 	channels: []
 } );
+bot.setMaxListeners(11);
 
 const kraken = {
 	Accept: 'application/vnd.twitchtv.v5+json',
@@ -465,7 +466,7 @@ function bot_link(channel, title, wiki) {
 								else {
 									querypage = thbody.query.pages[thread.slice(1).join(':')];
 									if ( querypage.missing !== undefined ) {
-										bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
+										bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki.toLink('', '', '', body.query.general) );
 									}
 									else {
 										var text = wiki.toLink(thread.join(':'), '', '', body.query.general);
@@ -500,7 +501,7 @@ function bot_link(channel, title, wiki) {
 							var wsbody = wsresponse.body;
 							if ( wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.total || !wsbody.items || !wsbody.items.length ) {
 								if ( wsbody && ( !wsbody.total || ( wsbody.items && !wsbody.items.length ) || ( wsbody.exception && wsbody.exception.code === 404 ) ) ) {
-									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
+									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki.toLink('', '', '', body.query.general) );
 								}
 								else {
 									console.log( '- ' + wsresponse.statusCode + ': Error while getting the search results: ' + ( wsbody && wsbody.exception && wsbody.exception.details ) );
@@ -562,7 +563,7 @@ function bot_link(channel, title, wiki) {
 							}
 							else {
 								if ( !srbody.query ) {
-									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki );
+									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki.toLink('', '', '', body.query.general) );
 								}
 								else {
 									querypage = Object.values(srbody.query.pages)[0];
@@ -1142,23 +1143,23 @@ function saveCheckedGames(channel, mention) {
 bot.connect().catch( error => console.log( '- Error while connecting: ' + error ) );
 
 
-async function graceful(code = 0) {
+async function graceful(signal) {
 	stop = true;
-	console.log( '- SIGTERM: Preparing to close...' );
+	console.log( '- ' + signal + ': Preparing to close...' );
 	clearInterval(checkGamesInterval);
 	setTimeout( async () => {
-		console.log( '- SIGTERM: Destroying client...' );
+		console.log( '- ' + signal + ': Destroying client...' );
 		await bot.disconnect();
 		await db.close( dberror => {
 			if ( dberror ) {
-				console.log( '- SIGTERM: Error while closing the database connection: ' + dberror );
+				console.log( '- ' + signal + ': Error while closing the database connection: ' + dberror );
 				return dberror;
 			}
-			console.log( '- SIGTERM: Closed the database connection.' );
+			console.log( '- ' + signal + ': Closed the database connection.' );
 		} );
 		setTimeout( async () => {
-			console.log( '- SIGTERM: Closing takes too long, terminating!' );
-			process.exit(code);
+			console.log( '- ' + signal + ': Closing takes too long, terminating!' );
+			process.exit(0);
 		}, 2000 ).unref();
 	}, 1000 ).unref();
 }
