@@ -32,6 +32,10 @@ Twitch channel: [https://www.twitch.tv/WikiBot](https://www.twitch.tv/WikiBot)
 <br>*Enabled by default*
 <br>*Streamer and mods only*
 
+### `!wiki setcooldown <seconds>`
+**WikiBot** will change the command cooldown for the stream.
+<br>*Streamer and mods only*
+
 ### `!wiki join @<your name>`
 **WikiBot** will join your stream chat.
 
