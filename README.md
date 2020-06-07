@@ -32,6 +32,11 @@ Twitch channel: [https://www.twitch.tv/WikiBot](https://www.twitch.tv/WikiBot)
 <br>*Enabled by default*
 <br>*Streamer and mods only*
 
+### `!wiki setrestriction <restriction>`
+**WikiBot** will change the command restriction for the stream.
+<br>Possible restrictions: `everyone`, `subscribers`, `moderators`
+<br>*Streamer and mods only*
+
 ### `!wiki setcooldown <seconds>`
 **WikiBot** will change the command cooldown for the stream.
 <br>*Streamer and mods only*

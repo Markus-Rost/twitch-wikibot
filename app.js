@@ -64,7 +64,7 @@ function getSettings(trysettings = 1) {
 		if ( dberror ) {
 			console.log( '- ' + trysettings + '. Error while getting the settings: ' + dberror );
 			if ( dberror.message === 'SQLITE_ERROR: no such table: twitch' ) {
-				db.run( 'CREATE TABLE IF NOT EXISTS twitch(id INTEGER PRIMARY KEY UNIQUE NOT NULL, name TEXT NOT NULL, wiki TEXT NOT NULL DEFAULT [https://help.gamepedia.com/], game TEXT, cooldown INTEGER NOT NULL DEFAULT [0]) WITHOUT ROWID', [], function (error) {
+				db.run( 'CREATE TABLE IF NOT EXISTS twitch(id INTEGER PRIMARY KEY UNIQUE NOT NULL, name TEXT NOT NULL, wiki TEXT NOT NULL DEFAULT [https://help.gamepedia.com/], game TEXT, restriction TEXT NOT NULL DEFAULT [everyone], cooldown INTEGER NOT NULL DEFAULT [0]) WITHOUT ROWID', [], function (error) {
 					if ( error ) {
 						console.log( '- Error while creating the table: ' + error );
 						return error;
@@ -207,11 +207,14 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 	
 	if ( !( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix || msg.includes( '[[' ) || msg.includes( '{{' ) ) ) return;
 	console.log( channel + ': ' + msg );
-	db.get( 'SELECT wiki, cooldown FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
+	db.get( 'SELECT wiki, restriction, cooldown FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
 		if ( dberror || !row ) {
 			console.log( '- Error while getting the wiki: ' + dberror );
 			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I got an error!' );
 			return dberror;
+		}
+		if ( ( row.restriction === 'moderators' && !userstate.mod ) || ( row.restriction === 'subscribers' && !userstate.subscriber ) ) {
+			return console.log( '- ' + channel + ' is restricted.' );
 		}
 		if ( ( cooldown[channel] || 0 ) + row.cooldown > Date.now() ) return console.log( '- ' + channel + ' is still on cooldown.' );
 		cooldown[channel] = Date.now();
