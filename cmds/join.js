@@ -1,3 +1,5 @@
+const checkGames = require('../functions/checkGames.js');
+
 const kraken = {
 	Accept: 'application/vnd.twitchtv.v5+json',
 	'Client-ID': process.env.client,
@@ -6,7 +8,7 @@ const kraken = {
 
 function cmd_join(channel, userstate, msg, args, wiki) {
 	if ( args.join(' ').toLowerCase().replace( /^@/, '' ) === userstate.username ) {
-		db.run( 'INSERT INTO twitch(id, name, wiki) VALUES(?, ?, ?)', [userstate['user-id'], userstate.username, wiki], function (dberror) {
+		db.run( 'INSERT INTO twitch(id, name, wiki) VALUES(?, ?, ?)', [userstate['user-id'], userstate.username, wiki.url], function (dberror) {
 			if ( dberror ) {
 				if ( dberror.message === 'SQLITE_CONSTRAINT: UNIQUE constraint failed: twitch.id' ) {
 					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I already joined your stream.' );
@@ -20,7 +22,7 @@ function cmd_join(channel, userstate, msg, args, wiki) {
 			bot.join(userstate.username);
 			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I joined your stream.' );
 			
-			module.parent.exports.checkGames([{id:parseInt(userstate['user-id'], 10),game:null}], [userstate.username,userstate['display-name']]);
+			checkGames([{id:parseInt(userstate['user-id'], 10),game:null}], [userstate.username,userstate['display-name']]);
 			
 			got.put( 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'], {
 				headers: kraken,

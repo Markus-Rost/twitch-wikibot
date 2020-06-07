@@ -44,25 +44,8 @@ global.bot = new tmi.client( {
 	channels: []
 } );
 
-var allSites = [];
-function getAllSites() {
-	got.get( 'https://help.gamepedia.com/api.php?action=allsites&formatversion=2&do=getSiteStats&filter=wikis|wiki_domain,wiki_display_name,wiki_managers,official_wiki,wiki_crossover,ss_good_articles&format=json', {
-		responseType: 'json'
-	} ).then( response => {
-		var body = response.body;
-		if ( response.statusCode !== 200 || !body || body.status !== 'okay' || !body.data || !body.data.wikis ) {
-			console.log( '- ' + response.statusCode + ': Error while gettings all sites: ' + ( body && body.error && body.error.info ) );
-		}
-		else {
-			console.log( '- Sites successfully loaded.' );
-			allSites = JSON.parse(JSON.stringify(body.data.wikis.filter( site => /^[a-z\d-]{1,50}\.gamepedia\.com$/.test(site.wiki_domain) )));
-			allSites.filter( site => site.wiki_crossover ).forEach( site => site.wiki_crossover = site.wiki_crossover.replace( /^(?:https?:)?\/\/(([a-z\d-]{1,50})\.(?:fandom\.com|wikia\.org)(?:(?!\/wiki\/)\/([a-z-]{1,8}))?).*/, '$1' ) );
-		}
-	}, error => {
-			console.log( '- Error while gettings all sites: ' + error );
-	} );
-}
-getAllSites();
+const {Wiki} = require('./functions/wiki.js');
+const checkGames = require('./functions/checkGames.js');
 
 function getSettings(trysettings = 1) {
 	var channels = [];
@@ -206,132 +189,10 @@ const checkGamesInterval = setInterval( () => {
 	} );
 }, 60000 );
 
-function checkGames(channels, mention) {
-	if ( channels.length > 100 ) {
-		checkGames(channels.slice(100), mention);
-		channels = channels.slice(0, 100);
-	}
-	if ( channels.length ) got.get( 'https://api.twitch.tv/kraken/channels?id=' + channels.map( channel => channel.id ).join(','), {
-		headers: kraken,
-		responseType: 'json'
-	} ).then( response => {
-		var body = response.body;
-		if ( response.statusCode !== 200 || !body || body.error || !body.channels ) {
-			console.log( '- ' + response.statusCode + ': Error while checking games: ' + ( body && ( body.message || body.error ) ) );
-			if ( mention ) bot.say( mention[0], 'gamepediaWIKIBOT @' + mention[1] + ', I couldn\'t start changing the default wiki automatically :(' );
-		}
-		else {
-			var updated = body.channels.filter( user => user.game !== channels.find( channel => channel.id === user._id ).game );
-			if ( updated.length ) updated.forEach( channel => {
-				var game = channel.game;
-				if ( game ) {
-					channel.text = 'I automatically changed the default wiki to: ';
-					var wiki = allSites.find( site => site.wiki_domain === game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' && ( site.ss_good_articles >= 100 || site.official_wiki || site.wiki_crossover ) );
-					if ( wiki ) {
-						channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
-						saveCheckedGames(channel, mention);
-					}
-					else {
-						wiki = allSites.find( site => site.wiki_display_name === game + ' Wiki (EN)' && ( site.ss_good_articles >= 100 || site.official_wiki || site.wiki_crossover ) );
-						if ( wiki ) {
-							channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
-							saveCheckedGames(channel, mention);
-						}
-						else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json', {
-							responseType: 'json'
-						} ).then( wsresponse => {
-							var wsbody = wsresponse.body;
-							if ( wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.items ) {
-								console.log( '- ' + wsresponse.statusCode + ': Error while getting the wiki results: ' + ( wsbody && wsbody.exception && wsbody.exception.details ) );
-								channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';
-								saveCheckedGames(channel, mention);
-							}
-							else {
-								wiki = wsbody.items.find( site => site.stats.articles >= 100 );
-								if ( wiki ) {
-									channel.wiki = wiki.url + '/';
-									saveCheckedGames(channel, mention);
-								}
-								else if ( /(?: \d{1,2}| [IV]{1,3}|: .+)$/.test(game) ) {
-									game = game.replace( /(?: \d{1,2}| [IV]{1,3}|: .+)$/, '' );
-									wiki = allSites.find( site => site.wiki_domain === game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' && ( site.ss_good_articles >= 100 || site.official_wiki || site.wiki_crossover ) );
-									if ( wiki ) {
-										channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
-										saveCheckedGames(channel, mention);
-									}
-									else {
-										wiki = allSites.find( site => site.wiki_display_name === game + ' Wiki (EN)' && ( site.ss_good_articles >= 100 || site.official_wiki || site.wiki_crossover ) );
-										if ( wiki ) {
-											channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
-											saveCheckedGames(channel, mention);
-										}
-										else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json', {
-											responseType: 'json'
-										} ).then( ws2response => {
-											var ws2body = ws2response.body;
-											if ( ws2response.statusCode !== 200 || !ws2body || ws2body.exception || !ws2body.items ) {
-												console.log( '- ' + ws2response.statusCode + ': Error while getting the wiki results: ' + ( ws2body && ws2body.exception && ws2body.exception.details ) );
-												channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';
-											}
-											else {
-												wiki = ws2body.items.find( site => site.stats.articles >= 100 );
-												if ( wiki ) channel.wiki = wiki.url + '/';
-												else channel.text = 'I couldn\'t find a wiki for "' + channel.game + '", I kept the current default wiki.';
-											}
-											saveCheckedGames(channel, mention);
-										}, ws2error => {
-											console.log( '- Error while getting the wiki results: ' + ws2error );
-											channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';
-											saveCheckedGames(channel, mention);
-										} );
-									}
-								}
-								else {
-									channel.text = 'I couldn\'t find a wiki for "' + channel.game + '", I kept the current default wiki.';
-									saveCheckedGames(channel, mention);
-								}
-							}
-						}, wserror => {
-							console.log( '- Error while getting the wiki results: ' + wserror );
-							channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';
-							saveCheckedGames(channel, mention);
-						} );
-					}
-				}
-				else {
-					channel.text = 'No game is set, I kept the current default wiki.';
-					saveCheckedGames(channel, mention);
-				}
-			} );
-		}
-	}, error => {
-		console.log( '- Error while checking games: ' + error );
-		if ( mention ) bot.say( mention[0], 'gamepediaWIKIBOT @' + mention[1] + ', I couldn\'t start changing the default wiki automatically :(' );
-	} );
-}
-
-function saveCheckedGames(channel, mention) {
-	var sql = 'UPDATE twitch SET game = ? WHERE id = ?';
-	var args = [channel.game, channel._id];
-	if ( channel.wiki ) {
-		sql = 'UPDATE twitch SET wiki = ?, game = ? WHERE id = ?';
-		args.unshift(channel.wiki);
-	}
-	db.run( sql, args, function (dberror) {
-		if ( dberror ) {
-			console.log( '- Error while updating the game for #' + channel.name + ': ' + dberror );
-			if ( mention ) bot.say( mention[0], 'gamepediaWIKIBOT @' + mention[1] + ', I couldn\'t start changing the default wiki automatically :(' );
-			return dberror;
-		}
-		console.log( '- Game successfully updated for #' + channel.name );
-		bot.say( channel.name, 'gamepediaWIKIBOT ' + ( mention ? '@' + mention[1] + ', ' : '' ) + channel.text + ( channel.wiki || '' ) );
-	} );
-}
-
 const fs = require('fs');
 var cmds = {};
-fs.readdirSync('./cmd').filter( file => file.endsWith('.js') ).forEach( file => {
-	var command = require('./cmd/' + file);
+fs.readdirSync('./cmds').filter( file => file.endsWith('.js') ).forEach( file => {
+	var command = require('./cmds/' + file);
 	cmds[command.name] = command.run;
 } );
 
@@ -345,7 +206,6 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 	if ( stop || self ) return;
 	
 	if ( !( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix || msg.includes( '[[' ) || msg.includes( '{{' ) ) ) return;
-	if ( !allSites.length ) getAllSites();
 	console.log( channel + ': ' + msg );
 	db.get( 'SELECT wiki, cooldown FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
 		if ( dberror || !row ) {
@@ -355,29 +215,29 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 		}
 		if ( ( cooldown[channel] || 0 ) + row.cooldown > Date.now() ) return console.log( '- ' + channel + ' is still on cooldown.' );
 		cooldown[channel] = Date.now();
-		var wiki = row.wiki;
+		var wiki = new Wiki(row.wiki);
 
 		if ( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix ) {
 			var args = msg.split(' ').slice(1);
 			if ( args[0] ) {
 				var invoke = args[0].toLowerCase();
-				if ( invoke in cmds ) cmds[invoke](channel, userstate, msg, args.slice(1), wiki);
-				else if ( /^![a-z\d-]{1,50}$/.test(invoke) ) cmds.LINK(channel, args.slice(1).join(' '), 'https://' + invoke.substring(1) + '.gamepedia.com/');
+				if ( invoke in cmds ) return cmds[invoke](channel, userstate, msg, args.slice(1), wiki);
+				else if ( /^![a-z\d-]{1,50}$/.test(invoke) ) {
+					args = args.slice(1);
+					wiki = new Wiki('https://' + invoke.substring(1) + '.gamepedia.com/');
+				}
 				else if ( /^\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
-					if ( invoke.includes( '.' ) ) wiki = 'https://' + invoke.split('.')[1] + '.fandom.com/' + invoke.substring(1).split('.')[0] + '/';
-					else wiki = 'https://' + invoke.substring(1) + '.fandom.com/';
-					cmds.LINK(channel, args.slice(1).join(' '), wiki);
+					args = args.slice(1);
+					if ( invoke.includes( '.' ) ) wiki = new Wiki('https://' + invoke.split('.')[1] + '.fandom.com/' + invoke.substring(1).split('.')[0] + '/');
+					else wiki = new Wiki('https://' + invoke.substring(1) + '.fandom.com/');
 				}
 				else if ( /^\?\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
-					if ( invoke.includes( '.' ) ) wiki = 'https://' + invoke.split('.')[1] + '.wikia.org/' + invoke.substring(2).split('.')[0] + '/';
-					else wiki = 'https://' + invoke.substring(2) + '.wikia.org/';
-					cmds.LINK(channel, args.slice(1).join(' '), wiki);
+					args = args.slice(1);
+					if ( invoke.includes( '.' ) ) wiki = new Wiki('https://' + invoke.split('.')[1] + '.wikia.org/' + invoke.substring(2).split('.')[0] + '/');
+					else wiki = new Wiki('https://' + invoke.substring(2) + '.wikia.org/');
 				}
-				else cmds.LINK(channel, args.join(' '), wiki);
 			}
-			else {
-				cmds.LINK(channel, args.join(' '), wiki);
-			}
+			cmds.LINK(channel, args.join(' '), wiki);
 		}
 	} );
 } );
@@ -398,10 +258,13 @@ bot.on( 'notice', function(channel, msgid, msg) {
 
 bot.connect().catch( error => console.log( '- Error while connecting: ' + error ) );
 
+String.prototype.replaceSave = function(pattern, replacement) {
+	return this.replace( pattern, ( typeof replacement === 'string' ? replacement.replace( /\$/g, '$$$$' ) : replacement ) );
+};
+
 module.exports = {
     checkGames
 };
-
 
 async function graceful(signal) {
 	stop = true;

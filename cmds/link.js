@@ -1,9 +1,13 @@
 const htmlparser = require('htmlparser2');
+const WikiBot = require('../functions/wiki.js');
+const cmd_random = require('../functions/random.js');
 
 function cmd_link(channel, title, wiki) {
+	wiki = new Wiki(wiki);
 	if ( title.length > 300 ) title = title.substring(0, 300);
-	if ( title.toLowerCase() === 'random' ) this.RANDOM(channel, wiki);
-	else got.get( wiki + 'api.php?action=query&meta=allmessages|siteinfo&ammessages=description&amenableparser=true&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( title ) + '&format=json', {
+	title = new Title(title);
+	if ( title.text.toLowerCase() === 'random' ) cmd_random(channel, wiki);
+	else got.get( wiki.url + 'api.php?action=query&meta=allmessages|siteinfo&ammessages=description&amenableparser=true&siprop=general|namespaces|specialpagealiases&iwurl=true&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( title.text ) + '&format=json', {
 		responseType: 'json'
 	} ).then( response => {
 		var body = response.body;
@@ -14,7 +18,7 @@ function cmd_link(channel, title, wiki) {
 			}
 			else {
 				console.log( '- ' + response.statusCode + ': Error while getting the search results: ' + ( body && body.error && body.error.info ) );
-				bot.say( channel, 'I got an error while searching: ' + wiki.toLink(( title ? 'Special:Search' : '' ), ( title ? 'search=' + title.toSearch() : '' )) );
+				bot.say( channel, 'I got an error while searching: ' + wiki.toLink(( title.text ? 'Special:Search' : '' ), ( title.text ? 'search=' + title.toSearch() : '' )) );
 			}
 		}
 		else {
@@ -28,7 +32,7 @@ function cmd_link(channel, title, wiki) {
 					querypage.ns = -1;
 				}
 				if ( querypages.length !== 1 ) querypage = {
-					title: title,
+					title: title.text,
 					invalidreason: 'The requested page title contains invalid characters: "|".',
 					invalid: ''
 				}
@@ -37,7 +41,7 @@ function cmd_link(channel, title, wiki) {
 					if ( wiki.isFandom() && !body.query.general.generator.startsWith( 'MediaWiki 1.3' ) ) {
 						if ( querypage.ns === 1201 ) {
 							var thread = querypage.title.split(':');
-							got.get( wiki + 'api.php?action=query&pageids=' + thread.slice(1).join(':') + '&format=json', {
+							got.get( wiki.url + 'api.php?action=query&pageids=' + thread.slice(1).join(':') + '&format=json', {
 								responseType: 'json'
 							} ).then( thresponse => {
 								var thbody = thresponse.body;
@@ -48,7 +52,7 @@ function cmd_link(channel, title, wiki) {
 								else {
 									querypage = thbody.query.pages[thread.slice(1).join(':')];
 									if ( querypage.missing !== undefined ) {
-										bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki.toLink('', '', '', body.query.general) );
+										bot.say( channel, 'I couldn\'t find a result for "' + title.text + '" on this wiki :( ' + wiki.toLink('', '', '', body.query.general) );
 									}
 									else {
 										var text = wiki.toLink(thread.join(':'), '', '', body.query.general);
@@ -77,13 +81,13 @@ function cmd_link(channel, title, wiki) {
 								bot.say( channel, 'I got an error while searching: ' + wiki.toLink(querypage.title, '', '', body.query.general) );
 							} );
 						}
-						else got.get( wiki + 'api/v1/Search/List?minArticleQuality=0&namespaces=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=1&query=' + encodeURIComponent( title ) + '&format=json', {
+						else got.get( wiki.url + 'api/v1/Search/List?minArticleQuality=0&namespaces=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join(',') + '&limit=1&query=' + encodeURIComponent( title.text ) + '&format=json', {
 							responseType: 'json'
 						} ).then( wsresponse => {
 							var wsbody = wsresponse.body;
 							if ( wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.total || !wsbody.items || !wsbody.items.length ) {
 								if ( wsbody && ( !wsbody.total || ( wsbody.items && !wsbody.items.length ) || ( wsbody.exception && wsbody.exception.code === 404 ) ) ) {
-									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki.toLink('', '', '', body.query.general) );
+									bot.say( channel, 'I couldn\'t find a result for "' + title.text + '" on this wiki :( ' + wiki.toLink('', '', '', body.query.general) );
 								}
 								else {
 									console.log( '- ' + wsresponse.statusCode + ': Error while getting the search results: ' + ( wsbody && wsbody.exception && wsbody.exception.details ) );
@@ -96,7 +100,7 @@ function cmd_link(channel, title, wiki) {
 									querypage.title = body.query.namespaces[querypage.ns]['*'] + ':' + querypage.title;
 								}
 								var text = '';
-								if ( title.replace( /\-/g, ' ' ).toTitle().toLowerCase() === querypage.title.replace( /\-/g, ' ' ).toTitle().toLowerCase() ) {
+								if ( title.toTitle().replace( /\-/g, '_' ).toLowerCase() === new Title(querypage.title).toTitle().replace( /\-/g, '_' ).toLowerCase() ) {
 									text = '';
 								}
 								else if ( wsbody.total === 1 ) {
@@ -135,7 +139,7 @@ function cmd_link(channel, title, wiki) {
 						} );
 					}
 					else {
-						got.get( wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrlimit=1&gsrsearch=' + encodeURIComponent( title ) + '&format=json', {
+						got.get( wiki.url + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&generator=search&gsrnamespace=' + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrlimit=1&gsrsearch=' + encodeURIComponent( title.text ) + '&format=json', {
 							responseType: 'json'
 						} ).then( srresponse => {
 							var srbody = srresponse.body;
@@ -145,12 +149,12 @@ function cmd_link(channel, title, wiki) {
 							}
 							else {
 								if ( !srbody.query ) {
-									bot.say( channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki.toLink('', '', '', body.query.general) );
+									bot.say( channel, 'I couldn\'t find a result for "' + title.text + '" on this wiki :( ' + wiki.toLink('', '', '', body.query.general) );
 								}
 								else {
 									querypage = Object.values(srbody.query.pages)[0];
 									var text = '';
-									if ( title.replace( /\-/g, ' ' ).toTitle().toLowerCase() === querypage.title.replace( /\-/g, ' ' ).toTitle().toLowerCase() ) {
+									if ( title.toTitle().replace( /\-/g, '_' ).toLowerCase() === new Title(querypage.title).toTitle().replace( /\-/g, '_' ).toLowerCase() ) {
 										text = '';
 									}
 									else if ( !srbody.continue ) {
@@ -254,7 +258,7 @@ function cmd_link(channel, title, wiki) {
 					console.log( '- Error while getting the description: ' + descerror );
 					bot.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 				} );
-				else got.get( wiki + 'api.php?action=query&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json', {
+				else got.get( wiki.url + 'api.php?action=query&redirects=true&prop=pageprops|extracts&ppprop=description&exsentences=10&exintro=true&explaintext=true&titles=' + encodeURIComponent( body.query.general.mainpage ) + '&format=json', {
 					responseType: 'json'
 				} ).then( mpresponse => {
 					var mpbody = mpresponse.body;
@@ -287,54 +291,49 @@ function cmd_link(channel, title, wiki) {
 		}
 		else {
 			console.log( '- Error while getting the search results: ' + error );
-			bot.say( channel, 'I got an error while searching: ' + wiki.toLink(( title ? 'Special:Search' : '' ), ( title ? 'search=' + title.toSearch() : '' )) );
+			bot.say( channel, 'I got an error while searching: ' + wiki.toLink(( title.text ? 'Special:Search' : '' ), ( title.text ? 'search=' + title.toSearch() : '' )) );
 		}
 	} );
 }
 
-String.prototype.noWiki = function(href) {
-	if ( !href ) return false;
-	else if ( this.startsWith( 'https://www.' ) ) return true;
-	else if ( this.endsWith( '.gamepedia.com/' ) ) return 'https://www.gamepedia.com/' === href;
-	else return [
-		this.replace( /^https:\/\/([a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org))\/(?:[a-z-]{1,8}\/)?$/, 'https://community.fandom.com/wiki/Community_Central:Not_a_valid_community?from=$1' ),
-		this + 'language-wikis'
-	].includes( href.replace( /Unexpected token < in JSON at position 0 in "([^ ]+)"/, '$1' ) );
-};
+class Wiki extends WikiBot.Wiki {
+	toLink(title = '', querystring = '', fragment = '', path) {
+		title = new Title(title);
+		var linksuffix = ( querystring ? '?' + new Title(querystring).toTitle(true) : '' ) + ( fragment ? '#' + new Title(fragment).toSection() : '' );
+		if ( path ) return ( path.server.startsWith( '//' ) ? 'https:' : '' ) + path.server + path.articlepath.replaceSave( '$1', title.toTitle() ) + ( path.articlepath.includes( '?' ) && linksuffix.startsWith( '?' ) ? '&' + linksuffix.substring(1) : linksuffix );
+		else if ( this.endsWith( '.gamepedia.com/' ) ) return this + title.toTitle() + linksuffix;
+		else if ( this.isFandom() ) return this + 'wiki/' + title.toTitle() + linksuffix;
+		else return this + 'index.php?title=' + title.toTitle(true) + ( linksuffix.startsWith( '?' ) ? '&' + linksuffix.substring(1) : linksuffix );
+	}
 
-String.prototype.isFandom = function() {
-	return /^https:\/\/[a-z\d-]{1,50}\.(?:fandom\.com|wikia\.org)\/(?:[a-z-]{1,8}\/)?$/.test(this);
-};
+	toDescLink(title = '') {
+		return this + 'wiki/' + encodeURIComponent( title.replace( / /g, '_' ) );
+	}
+}
 
-String.prototype.toLink = function(title = '', querystring = '', fragment = '', path) {
-	var linksuffix = ( querystring ? '?' + querystring.toTitle(true) : '' ) + ( fragment ? '#' + fragment.toSection() : '' );
-	if ( path ) return ( path.server.startsWith( '//' ) ? 'https:' : '' ) + path.server + path.articlepath.replaceSave( '$1', title.toTitle() ) + ( path.articlepath.includes( '?' ) && linksuffix.startsWith( '?' ) ? '&' + linksuffix.substring(1) : linksuffix );
-	else if ( this.endsWith( '.gamepedia.com/' ) ) return this + title.toTitle() + linksuffix;
-	else if ( this.isFandom() ) return this + 'wiki/' + title.toTitle() + linksuffix;
-	else return this + 'index.php?title=' + title.toTitle(true) + ( linksuffix.startsWith( '?' ) ? '&' + linksuffix.substring(1) : linksuffix );
-};
+class Title {
+	constructor(title) {
+		this.text = title.toString();
+	}
 
-String.prototype.toTitle = function(inQuery) {
-	var title = encodeURI( this.replace( / /g, '_' ) ).replace( /\,/g, '%2C').replace( /\'/g, '%27' ).replace( /\!/g, '%21' );
-	if ( inQuery ) return title.replace( /\&/g, '%26' );
-	else return title.replace( /\?/g, '%3F' );
-};
+	toString() {
+		return this.text;
+	}
 
-String.prototype.toSearch = function() {
-	return this.replace( / /g, '+' );
-};
+	toTitle(inQuery) {
+		var title = encodeURI( this.text.replace( / /g, '_' ) ).replace( /\,/g, '%2C').replace( /\'/g, '%27' ).replace( /\!/g, '%21' );
+		if ( inQuery ) return title.replace( /\&/g, '%26' );
+		else return title.replace( /\?/g, '%3F' );
+	}
 
-String.prototype.toSection = function() {
-	return encodeURIComponent( this.replace( / /g, '_' ) ).replace( /\'/g, '%27' ).replace( /\(/g, '%28' ).replace( /\)/g, '%29' ).replace( /\%/g, '.' );
-};
+	toSearch() {
+		return this.text.replace( / /g, '+' );
+	}
 
-String.prototype.toDescLink = function(title = '') {
-	return this + 'wiki/' + encodeURIComponent( title.replace( / /g, '_' ) );
-};
-
-String.prototype.replaceSave = function(pattern, replacement) {
-	return this.replace( pattern, ( typeof replacement === 'string' ? replacement.replace( /\$/g, '$$$$' ) : replacement ) );
-};
+	toSection() {
+		return encodeURIComponent( this.text.replace( / /g, '_' ) ).replace( /\'/g, '%27' ).replace( /\(/g, '%28' ).replace( /\)/g, '%29' ).replace( /\%/g, '.' );
+	}
+}
 
 module.exports = {
     name: 'LINK',
