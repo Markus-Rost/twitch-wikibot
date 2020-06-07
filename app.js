@@ -213,9 +213,7 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I got an error!' );
 			return dberror;
 		}
-		if ( ( row.restriction === 'moderators' && !userstate.mod ) || ( row.restriction === 'subscribers' && !userstate.subscriber ) ) {
-			return console.log( '- ' + channel + ' is restricted.' );
-		}
+		if ( !( userstate.mod || userstate['user-id'] === userstate['room-id'] || userstate['user-id'] === process.env.owner ) && ( row.restriction === 'moderators' || ( row.restriction === 'subscribers' && !userstate.subscriber ) ) ) return console.log( '- ' + channel + ' is restricted.' );
 		if ( ( cooldown[channel] || 0 ) + row.cooldown > Date.now() ) return console.log( '- ' + channel + ' is still on cooldown.' );
 		cooldown[channel] = Date.now();
 		var wiki = new Wiki(row.wiki);
