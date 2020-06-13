@@ -205,7 +205,7 @@ var cooldown = {};
 bot.on( 'chat', function(channel, userstate, msg, self) {
 	if ( stop || self ) return;
 	
-	if ( !( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix || msg.includes( '[[' ) || msg.includes( '{{' ) ) ) return;
+	if ( !( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix ) ) return;
 	console.log( channel + ': ' + msg );
 	db.get( 'SELECT wiki, restriction, cooldown FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
 		if ( dberror || !row ) {
@@ -217,29 +217,27 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 		if ( ( cooldown[channel] || 0 ) + row.cooldown > Date.now() ) return console.log( '- ' + channel + ' is still on cooldown.' );
 		cooldown[channel] = Date.now();
 		var wiki = new Wiki(row.wiki);
-
-		if ( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix ) {
-			var args = msg.split(' ').slice(1);
-			if ( args[0] ) {
-				var invoke = args[0].toLowerCase();
-				if ( invoke in cmds ) return cmds[invoke](channel, userstate, msg, args.slice(1), wiki);
-				else if ( /^![a-z\d-]{1,50}$/.test(invoke) ) {
-					args = args.slice(1);
-					wiki = new Wiki('https://' + invoke.substring(1) + '.gamepedia.com/');
-				}
-				else if ( /^\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
-					args = args.slice(1);
-					if ( invoke.includes( '.' ) ) wiki = new Wiki('https://' + invoke.split('.')[1] + '.fandom.com/' + invoke.substring(1).split('.')[0] + '/');
-					else wiki = new Wiki('https://' + invoke.substring(1) + '.fandom.com/');
-				}
-				else if ( /^\?\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
-					args = args.slice(1);
-					if ( invoke.includes( '.' ) ) wiki = new Wiki('https://' + invoke.split('.')[1] + '.wikia.org/' + invoke.substring(2).split('.')[0] + '/');
-					else wiki = new Wiki('https://' + invoke.substring(2) + '.wikia.org/');
-				}
+		
+		var args = msg.split(' ').slice(1);
+		if ( args[0] ) {
+			var invoke = args[0].toLowerCase();
+			if ( invoke in cmds ) return cmds[invoke](channel, userstate, msg, args.slice(1), wiki);
+			else if ( /^![a-z\d-]{1,50}$/.test(invoke) ) {
+				args = args.slice(1);
+				wiki = new Wiki('https://' + invoke.substring(1) + '.gamepedia.com/');
 			}
-			cmds.LINK(channel, args.join(' '), wiki);
+			else if ( /^\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
+				args = args.slice(1);
+				if ( invoke.includes( '.' ) ) wiki = new Wiki('https://' + invoke.split('.')[1] + '.fandom.com/' + invoke.substring(1).split('.')[0] + '/');
+				else wiki = new Wiki('https://' + invoke.substring(1) + '.fandom.com/');
+			}
+			else if ( /^\?\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
+				args = args.slice(1);
+				if ( invoke.includes( '.' ) ) wiki = new Wiki('https://' + invoke.split('.')[1] + '.wikia.org/' + invoke.substring(2).split('.')[0] + '/');
+				else wiki = new Wiki('https://' + invoke.substring(2) + '.wikia.org/');
+			}
 		}
+		cmds.LINK(channel, args.join(' '), wiki);
 	} );
 } );
 
