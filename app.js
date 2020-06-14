@@ -1,6 +1,4 @@
 require('dotenv').config();
-const util = require('util');
-util.inspect.defaultOptions = {compact:false,breakLength:Infinity};
 
 global.isDebug = ( process.argv[2] === 'debug' );
 global.stop = false;
@@ -58,7 +56,7 @@ function getSettings(trysettings = 1) {
 			}
 			return dberror;
 		}
-		bot.join(row.name).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( '#' + row.name + ': ', error ) ) );
+		bot.join(row.name).catch( error => ( error === 'No response from Twitch.' ? {} : console.log( '#' + row.name + ': ' + error ) ) );
 		channels.push(row);
 	}, (dberror) => {
 		if ( dberror ) {
@@ -143,7 +141,7 @@ function checkChannels(channels) {
 							console.log( '- Error while unfollowing ' + user.name + ': ' + delerror );
 						} );
 					}
-					else console.log( '#' + user.name + ': ', error );
+					else console.log( '#' + user.name + ': ' + error );
 				} );
 				if ( oldname !== user.name ) {
 					db.run( 'UPDATE twitch SET name = ? WHERE id = ?', [user.name, user._id], function (dberror) {
@@ -259,10 +257,6 @@ bot.connect().catch( error => console.log( '- Error while connecting: ' + error 
 
 String.prototype.replaceSave = function(pattern, replacement) {
 	return this.replace( pattern, ( typeof replacement === 'string' ? replacement.replace( /\$/g, '$$$$' ) : replacement ) );
-};
-
-module.exports = {
-    checkGames
 };
 
 async function graceful(signal) {
