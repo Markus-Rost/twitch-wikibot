@@ -49,11 +49,11 @@ function cmd_setwiki(channel, userstate, msg, args, wiki) {
 						if ( site ) wikinew = 'https://' + ( site.wiki_crossover || site.wiki_domain ) + '/';
 					}
 					wikinew = new Wiki(wikinew);
-					got.get( wikinew.url + 'api.php?action=query&format=json', {
+					got.get( wikinew.url + 'api.php?action=query&meta=allmessages|siteinfo&ammessages=custom-GamepediaNotice|custom-FandomMergeNotice&amenableparser=true&siprop=general&format=json', {
 						responseType: 'json'
 					} ).then( response => {
 						var body = response.body;
-						if ( response.statusCode !== 200 || !body || !( body instanceof Object ) ) {
+						if ( response.statusCode !== 200 || !body || !body.query || !body.query.allmessages ) {
 							if ( forced || wikinew.noWiki(response.url) || response.statusCode === 410 ) {
 								console.log( '- This wiki doesn\'t exist!' );
 								bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', this wiki does not exist!' );
@@ -61,6 +61,21 @@ function cmd_setwiki(channel, userstate, msg, args, wiki) {
 							}
 							console.log( '- ' + response.statusCode + ': Error while reaching the wiki: ' + ( body && body.error && body.error.info ) );
 							comment = ' I got an error while checking if the wiki exists!';
+						}
+						else if ( wikinew.endsWith( '.gamepedia.com/' ) && !forced ) {
+							let site = allSites.find( site => site.wiki_domain === body.query.general.servername );
+							if ( site ) wikinew = 'https://' + ( site.wiki_crossover || site.wiki_domain ) + '/';
+						}
+						else if ( wikinew.isFandom() && !forced ) {
+							let crossover = '';
+							if ( body.query.allmessages[0]['*'] ) {
+								crossover = 'https://' + body.query.allmessages[0]['*'] + '.gamepedia.com/';
+							}
+							else if ( body.query.allmessages[1]['*'] ) {
+								let merge = body.query.allmessages[1]['*'].split('/');
+								crossover = 'https://' + merge[0] + '.fandom.com/' + ( merge[1] ? merge[1] + '/' : '' );
+							}
+							if ( crossover ) wikinew = new Wiki(crossover);
 						}
 						return true;
 					}, error => {

@@ -53,8 +53,8 @@ function checkGames(channels, mention) {
 									channel.wiki = wiki.url + '/';
 									saveCheckedGames(channel, mention);
 								}
-								else if ( /(?: \d{1,2}| [IV]{1,3}|: .+)$/.test(game) ) {
-									game = game.replace( /(?: \d{1,2}| [IV]{1,3}|: .+)$/, '' );
+								else if ( /(?: \d{1,4}| [IVX]{1,3}|: .+)$/.test(game) ) {
+									game = game.replace( /(?: \d{1,4}| [IVX]{1,3}|: .+)$/, '' );
 									wiki = allSites.find( site => site.wiki_domain === game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' && ( site.ss_good_articles >= 100 || site.official_wiki || site.wiki_crossover ) );
 									if ( wiki ) {
 										channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
@@ -73,13 +73,53 @@ function checkGames(channels, mention) {
 											if ( ws2response.statusCode !== 200 || !ws2body || ws2body.exception || !ws2body.items ) {
 												console.log( '- ' + ws2response.statusCode + ': Error while getting the wiki results: ' + ( ws2body && ws2body.exception && ws2body.exception.details ) );
 												channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';
+												saveCheckedGames(channel, mention);
 											}
 											else {
-												wiki = ws2body.items.find( site => site.stats.articles >= 100 );
-												if ( wiki ) channel.wiki = wiki.url + '/';
-												else channel.text = 'I couldn\'t find a wiki for "' + channel.game + '", I kept the current default wiki.';
+												wiki = wsbody.items.find( site => site.stats.articles >= 100 );
+												if ( wiki ) {
+													channel.wiki = wiki.url + '/';
+													saveCheckedGames(channel, mention);
+												}
+												else if ( /(?: \d{1,4}| [IVX]{1,3}|: .+)$/.test(game) ) {
+													game = game.replace( /(?: \d{1,4}| [IVX]{1,3}|: .+)$/, '' );
+													wiki = allSites.find( site => site.wiki_domain === game.toLowerCase().replace( / /g, '' ) + '.gamepedia.com' && ( site.ss_good_articles >= 100 || site.official_wiki || site.wiki_crossover ) );
+													if ( wiki ) {
+														channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
+														saveCheckedGames(channel, mention);
+													}
+													else {
+														wiki = allSites.find( site => site.wiki_display_name === game + ' Wiki (EN)' && ( site.ss_good_articles >= 100 || site.official_wiki || site.wiki_crossover ) );
+														if ( wiki ) {
+															channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
+															saveCheckedGames(channel, mention);
+														}
+														else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json', {
+															responseType: 'json'
+														} ).then( ws3response => {
+															var ws3body = ws3response.body;
+															if ( ws3response.statusCode !== 200 || !ws3body || ws3body.exception || !ws3body.items ) {
+																console.log( '- ' + ws3response.statusCode + ': Error while getting the wiki results: ' + ( ws3body && ws3body.exception && ws3body.exception.details ) );
+																channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';
+															}
+															else {
+																wiki = ws3body.items.find( site => site.stats.articles >= 100 );
+																if ( wiki ) channel.wiki = wiki.url + '/';
+																else channel.text = 'I couldn\'t find a wiki for "' + channel.game + '", I kept the current default wiki.';
+															}
+															saveCheckedGames(channel, mention);
+														}, ws3error => {
+															console.log( '- Error while getting the wiki results: ' + ws3error );
+															channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';
+															saveCheckedGames(channel, mention);
+														} );
+													}
+												}
+												else {
+													channel.text = 'I couldn\'t find a wiki for "' + channel.game + '", I kept the current default wiki.';
+													saveCheckedGames(channel, mention);
+												}
 											}
-											saveCheckedGames(channel, mention);
 										}, ws2error => {
 											console.log( '- Error while getting the wiki results: ' + ws2error );
 											channel.text = 'I got an error while searching for a wiki, I kept the current default wiki.';

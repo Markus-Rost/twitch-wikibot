@@ -1,7 +1,7 @@
 var allSites = [];
 function getAllSites(callback, force = false) {
-    if ( allSites.length && !force ) return callback(allSites);
-    got.get( 'https://help.gamepedia.com/api.php?action=allsites&formatversion=2&do=getSiteStats&filter=wikis|wiki_domain,wiki_display_name,wiki_managers,official_wiki,wiki_crossover,ss_good_articles&format=json', {
+    if ( allSites.length && !force && callback ) return callback(allSites);
+    got.get( 'https://commons.gamepedia.com/api.php?action=allsites&formatversion=2&do=getSiteStats&filter=wikis|wiki_domain,wiki_display_name,wiki_managers,official_wiki,wiki_crossover,ss_good_articles&format=json', {
 		responseType: 'json'
 	} ).then( response => {
 		var body = response.body;
@@ -11,8 +11,8 @@ function getAllSites(callback, force = false) {
 		else {
 			console.log( '- Sites successfully loaded.' );
 			allSites = JSON.parse(JSON.stringify(body.data.wikis.filter( site => /^[a-z\d-]{1,50}\.gamepedia\.com$/.test(site.wiki_domain) )));
-            allSites.filter( site => site.wiki_crossover ).forEach( site => site.wiki_crossover = site.wiki_crossover.replace( /^(?:https?:)?\/\/(([a-z\d-]{1,50})\.(?:fandom\.com|wikia\.org)(?:(?!\/wiki\/)\/([a-z-]{1,8}))?).*/, '$1' ) );
-            if ( callback ) callback(allSites);
+			allSites.filter( site => site.wiki_crossover ).forEach( site => site.wiki_crossover = site.wiki_crossover.replace( /^(?:https?:)?\/\/(([a-z\d-]{1,50})\.(?:fandom\.com|wikia\.org)(?:(?!\/wiki\/)\/([a-z-]{1,8}))?).*/, '$1' ) );
+			if ( callback ) callback(allSites);
 		}
 	}, error => {
 			console.log( '- Error while gettings all sites: ' + error );

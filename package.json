@@ -10,11 +10,11 @@
   "author": "MarkusRost",
   "license": "ISC",
   "dependencies": {
-    "dotenv": "^6.2.0",
-    "got": "^10.7.0",
-    "htmlparser2": "^3.10.1",
-    "npm": "^6.14.4",
-    "sqlite3": "^4.2.0",
+    "dotenv": "^8.2.0",
+    "got": "^11.7.0",
+    "htmlparser2": "^5.0.0",
+    "npm": "^7.0.2",
+    "sqlite3": "^5.0.0",
     "tmi.js": "^1.5.0"
   },
   "repository": {
