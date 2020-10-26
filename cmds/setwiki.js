@@ -62,9 +62,9 @@ function cmd_setwiki(channel, userstate, msg, args, wiki) {
 							console.log( '- ' + response.statusCode + ': Error while reaching the wiki: ' + ( body && body.error && body.error.info ) );
 							comment = ' I got an error while checking if the wiki exists!';
 						}
-						else if ( wikinew.endsWith( '.gamepedia.com/' ) && !forced ) {
+						else if ( wikinew.url.endsWith( '.gamepedia.com/' ) && !forced ) {
 							let site = allSites.find( site => site.wiki_domain === body.query.general.servername );
-							if ( site ) wikinew = 'https://' + ( site.wiki_crossover || site.wiki_domain ) + '/';
+							if ( site ) wikinew = new Wiki('https://' + ( site.wiki_crossover || site.wiki_domain ) + '/');
 						}
 						else if ( wikinew.isFandom() && !forced ) {
 							let crossover = '';
