@@ -17,15 +17,15 @@ async function cmd_eval(channel, userstate, msg, args, wiki) {
 }
 		
 function database(sql, sqlargs = []) {
-    return new Promise( function (resolve, reject) {
-        db.all( sql, sqlargs, (error, rows) => {
-            if (error) reject(error);
-            resolve(rows);
-        } );
-    } );
+	return new Promise( function (resolve, reject) {
+		db.all( sql, sqlargs, (error, rows) => {
+			if (error) reject(error);
+			resolve(rows);
+		} );
+	} );
 }
 
 module.exports = {
-    name: 'eval',
-    run: cmd_eval
+	name: 'eval',
+	run: cmd_eval
 };

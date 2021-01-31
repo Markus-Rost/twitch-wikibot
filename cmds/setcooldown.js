@@ -23,6 +23,6 @@ function cmd_setcooldown(channel, userstate, msg, args, wiki) {
 }
 
 module.exports = {
-    name: 'setcooldown',
-    run: cmd_setcooldown
+	name: 'setcooldown',
+	run: cmd_setcooldown
 };

@@ -9,13 +9,16 @@
   },
   "author": "MarkusRost",
   "license": "ISC",
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "dependencies": {
+    "cheerio": "^1.0.0-rc.5",
     "dotenv": "^8.2.0",
-    "got": "^11.7.0",
-    "htmlparser2": "^5.0.0",
-    "npm": "^7.0.2",
-    "sqlite3": "^5.0.0",
-    "tmi.js": "^1.5.0"
+    "got": "^11.8.1",
+    "npm": "^7.5.0",
+    "sqlite3": "^5.0.1",
+    "tmi.js": "^1.7.1"
   },
   "repository": {
     "type": "git",

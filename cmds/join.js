@@ -8,7 +8,7 @@ const kraken = {
 
 function cmd_join(channel, userstate, msg, args, wiki) {
 	if ( args.join(' ').toLowerCase().replace( /^@/, '' ) === userstate.username ) {
-		db.run( 'INSERT INTO twitch(id, name, wiki) VALUES(?, ?, ?)', [userstate['user-id'], userstate.username, wiki.url], function (dberror) {
+		db.run( 'INSERT INTO twitch(id, name, wiki) VALUES(?, ?, ?)', [userstate['user-id'], userstate.username, wiki.href], function (dberror) {
 			if ( dberror ) {
 				if ( dberror.message === 'SQLITE_CONSTRAINT: UNIQUE constraint failed: twitch.id' ) {
 					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I already joined your stream.' );
@@ -25,8 +25,7 @@ function cmd_join(channel, userstate, msg, args, wiki) {
 			checkGames([{id:parseInt(userstate['user-id'], 10),game:null}], [userstate.username,userstate['display-name']]);
 			
 			got.put( 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'], {
-				headers: kraken,
-				responseType: 'json'
+				headers: kraken
 			} ).then( response => {
 				var body = response.body;
 				if ( response.statusCode !== 200 || !body || body.error ) {
@@ -44,6 +43,6 @@ function cmd_join(channel, userstate, msg, args, wiki) {
 }
 
 module.exports = {
-    name: 'join',
-    run: cmd_join
+	name: 'join',
+	run: cmd_join
 };

@@ -7,6 +7,6 @@ function cmd_help(channel, userstate, msg, args, wiki) {
 }
 
 module.exports = {
-    name: 'help',
-    run: cmd_help
+	name: 'help',
+	run: cmd_help
 };

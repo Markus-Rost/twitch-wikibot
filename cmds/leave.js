@@ -17,8 +17,7 @@ function cmd_leave(channel, userstate, msg, args, wiki) {
 			bot.part(userstate.username);
 			
 			got.delete( 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'], {
-				headers: kraken,
-				responseType: 'json'
+				headers: kraken
 			} ).then( response => {
 				var body = response.body;
 				if ( response.statusCode !== 204 || body ) {
@@ -36,6 +35,6 @@ function cmd_leave(channel, userstate, msg, args, wiki) {
 }
 
 module.exports = {
-    name: 'leave',
-    run: cmd_leave
+	name: 'leave',
+	run: cmd_leave
 };

@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 global.isDebug = ( process.argv[2] === 'debug' );
-global.stop = false;
+var isStop = false;
 const kraken = {
 	Accept: 'application/vnd.twitchtv.v5+json',
 	'Client-ID': process.env.client,
@@ -13,7 +13,8 @@ global.got = require('got').extend( {
 	timeout: 5000,
 	headers: {
 		'user-agent': 'WikiBot/' + ( isDebug ? 'testing' : process.env.npm_package_version ) + ' (Twitch; ' + process.env.npm_package_name + ')'
-	}
+	},
+	responseType: 'json'
 } );
 
 const sqlite3 = require('sqlite3').verbose();
@@ -42,7 +43,7 @@ global.bot = new tmi.client( {
 	channels: []
 } );
 
-const {Wiki} = require('./functions/wiki.js');
+const Wiki = require('./functions/wiki.js');
 const checkGames = require('./functions/checkGames.js');
 
 function getSettings(trysettings = 1) {
@@ -100,14 +101,13 @@ function getSettings(trysettings = 1) {
 }
 
 function checkChannels(channels) {
-	if ( stop ) return;
+	if ( isStop ) return;
 	if ( channels.length > 100 ) {
 		checkChannels(channels.slice(100));
 		channels = channels.slice(0, 100);
 	}
 	if ( channels.length ) got.get( 'https://api.twitch.tv/kraken/channels?id=' + channels.map( channel => channel.id ).join(','), {
-		headers: kraken,
-		responseType: 'json'
+		headers: kraken
 	} ).then( response => {
 		var body = response.body;
 		if ( response.statusCode !== 200 || !body || body.error || !body.channels ) {
@@ -128,8 +128,7 @@ function checkChannels(channels) {
 						} );
 						
 						got.delete( 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + user._id, {
-							headers: kraken,
-							responseType: 'json'
+							headers: kraken
 						} ).then( delresponse => {
 							var delbody = delresponse.body;
 							if ( delresponse.statusCode !== 204 || delbody ) {
@@ -201,7 +200,7 @@ bot.on('connected', function(address, port) {
 
 var cooldown = {};
 bot.on( 'chat', function(channel, userstate, msg, self) {
-	if ( stop || self ) return;
+	if ( isStop || self ) return;
 	
 	if ( !( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix ) ) return;
 	console.log( channel + ': ' + msg );
@@ -240,11 +239,14 @@ bot.on( 'chat', function(channel, userstate, msg, self) {
 } );
 
 bot.on( 'whisper', function(channel, userstate, msg, self) {
-	if ( stop || self ) return;
+	if ( isStop || self ) return;
 	
+	console.log( 'DM - ' + channel + ': ' + msg );
 	if ( channel === '#' + process.env.ownername.toLowerCase() ) {
 		var args = msg.split(' ');
-		if ( args[0].startsWith( '#' ) && args.length >= 2 ) bot.whisper( args[0], args.splice(1).join(' ') );
+		if ( args[0].startsWith( '#' ) && args.length >= 2 ) {
+			bot.whisper( args[0], args.splice(1).join(' ') );
+		}
 	}
 	else bot.whisper( process.env.ownername, channel + ': ' + msg );
 } );
@@ -255,12 +257,8 @@ bot.on( 'notice', function(channel, msgid, msg) {
 
 bot.connect().catch( error => console.log( '- Error while connecting: ' + error ) );
 
-String.prototype.replaceSave = function(pattern, replacement) {
-	return this.replace( pattern, ( typeof replacement === 'string' ? replacement.replace( /\$/g, '$$$$' ) : replacement ) );
-};
-
 async function graceful(signal) {
-	stop = true;
+	isStop = true;
 	console.log( '- ' + signal + ': Preparing to close...' );
 	clearInterval(checkGamesInterval);
 	setTimeout( async () => {

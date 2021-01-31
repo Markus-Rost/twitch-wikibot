@@ -1,9 +1,7 @@
 var allSites = [];
 function getAllSites(callback, force = false) {
-    if ( allSites.length && !force && callback ) return callback(allSites);
-    got.get( 'https://commons.gamepedia.com/api.php?action=allsites&formatversion=2&do=getSiteStats&filter=wikis|wiki_domain,wiki_display_name,wiki_managers,official_wiki,wiki_crossover,ss_good_articles&format=json', {
-		responseType: 'json'
-	} ).then( response => {
+	if ( allSites.length && !force && callback ) return callback(allSites);
+	got.get( 'https://commons.gamepedia.com/api.php?action=allsites&formatversion=2&do=getSiteStats&filter=wikis|wiki_domain,wiki_display_name,wiki_managers,official_wiki,wiki_crossover,ss_good_articles&format=json' ).then( response => {
 		var body = response.body;
 		if ( response.statusCode !== 200 || !body || body.status !== 'okay' || !body.data || !body.data.wikis ) {
 			console.log( '- ' + response.statusCode + ': Error while gettings all sites: ' + ( body && body.error && body.error.info ) );

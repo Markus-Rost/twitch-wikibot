@@ -1,0 +1,56 @@
+{
+	"defaultSettings": {
+		"lang": "en",
+		"wiki": "https://en.wikipedia.org/w/"
+	},
+	"wikiProjects": [
+		{
+			"name": "wikipedia.org",
+			"regex": "((?:[a-z\\d-]{1,50}\\.)?(?:m\\.)?wikipedia\\.org)",
+			"articlePath": "/wiki/",
+			"scriptPath": "/w/"
+		},
+		{
+			"name": "mediawiki.org",
+			"regex": "((?:[a-z\\d-]{1,50}\\.)?(?:m\\.)?mediawiki\\.org)",
+			"articlePath": "/wiki/",
+			"scriptPath": "/w/"
+		},
+		{
+			"name": "wikimedia.org",
+			"regex": "((?:[a-z\\d-]{1,50}\\.)?(?:m\\.)?wikimedia\\.org)",
+			"articlePath": "/wiki/",
+			"scriptPath": "/w/"
+		},
+		{
+			"name": "miraheze.org",
+			"regex": "((?:[a-z\\d-]{1,50}\\.)miraheze\\.org)",
+			"articlePath": "/wiki/",
+			"scriptPath": "/w/"
+		},
+		{
+			"name": "paradoxwikis.com",
+			"regex": "((?:[a-z\\d-]{1,50}\\.)paradoxwikis\\.com)",
+			"articlePath": "/",
+			"scriptPath": "/"
+		},
+		{
+			"name": "runescape.wiki",
+			"regex": "((?:(?:classic|oldschool|pt|www)\\.)?runescape\\.wiki)",
+			"articlePath": "/w/",
+			"scriptPath": "/"
+		},
+		{
+			"name": "wiki.biligame.com",
+			"regex": "(wiki\\.biligame\\.com(?:/[a-z\\d]{1,50}))",
+			"articlePath": "/",
+			"scriptPath": "/"
+		},
+		{
+			"name": "brickimedia.org",
+			"regex": "((?:[a-z\\d-]{1,50}\\.)brickimedia\\.org)",
+			"articlePath": "/wiki/",
+			"scriptPath": "/w/"
+		}
+	]
+}

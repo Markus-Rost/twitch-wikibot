@@ -13,8 +13,7 @@ function checkGames(channels, mention) {
 		channels = channels.slice(0, 100);
 	}
 	if ( channels.length ) got.get( 'https://api.twitch.tv/kraken/channels?id=' + channels.map( channel => channel.id ).join(','), {
-		headers: kraken,
-		responseType: 'json'
+		headers: kraken
 	} ).then( response => {
 		var body = response.body;
 		if ( response.statusCode !== 200 || !body || body.error || !body.channels ) {
@@ -38,9 +37,7 @@ function checkGames(channels, mention) {
 							channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
 							saveCheckedGames(channel, mention);
 						}
-						else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json', {
-							responseType: 'json'
-						} ).then( wsresponse => {
+						else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json' ).then( wsresponse => {
 							var wsbody = wsresponse.body;
 							if ( wsresponse.statusCode !== 200 || !wsbody || wsbody.exception || !wsbody.items ) {
 								console.log( '- ' + wsresponse.statusCode + ': Error while getting the wiki results: ' + ( wsbody && wsbody.exception && wsbody.exception.details ) );
@@ -66,9 +63,7 @@ function checkGames(channels, mention) {
 											channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
 											saveCheckedGames(channel, mention);
 										}
-										else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json', {
-											responseType: 'json'
-										} ).then( ws2response => {
+										else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json' ).then( ws2response => {
 											var ws2body = ws2response.body;
 											if ( ws2response.statusCode !== 200 || !ws2body || ws2body.exception || !ws2body.items ) {
 												console.log( '- ' + ws2response.statusCode + ': Error while getting the wiki results: ' + ( ws2body && ws2body.exception && ws2body.exception.details ) );
@@ -94,9 +89,7 @@ function checkGames(channels, mention) {
 															channel.wiki = 'https://' + ( wiki.wiki_crossover || wiki.wiki_domain ) + '/';
 															saveCheckedGames(channel, mention);
 														}
-														else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json', {
-															responseType: 'json'
-														} ).then( ws3response => {
+														else got.get( 'https://community.fandom.com/api/v1/Wikis/ByString?expand=true&includeDomain=true&lang=en&limit=10&string=' + encodeURIComponent( game ) + '&format=json' ).then( ws3response => {
 															var ws3body = ws3response.body;
 															if ( ws3response.statusCode !== 200 || !ws3body || ws3body.exception || !ws3body.items ) {
 																console.log( '- ' + ws3response.statusCode + ': Error while getting the wiki results: ' + ( ws3body && ws3body.exception && ws3body.exception.details ) );
