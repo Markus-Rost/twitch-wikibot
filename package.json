@@ -1,6 +1,7 @@
 {
   "name": "twitch-wikibot",
-  "version": "2.2.0",
+  "version": "3.0.0",
+  "type": "module",
   "description": "WikiBot is a bot for Twitch with the purpose to easily link to Gamepedia and Fandom wikis.",
   "main": "app.js",
   "scripts": {
@@ -10,15 +11,16 @@
   "author": "MarkusRost",
   "license": "ISC",
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.1.0"
   },
   "dependencies": {
-    "cheerio": "^1.0.0-rc.5",
-    "dotenv": "^8.2.0",
-    "got": "^11.8.1",
-    "npm": "^7.5.0",
-    "sqlite3": "^5.0.1",
-    "tmi.js": "^1.7.1"
+    "cheerio": "^1.0.0-rc.10",
+    "dotenv": "^16.0.1",
+    "got": "^12.0.4",
+    "got-ssrf": "^1.3.0",
+    "npm": "^8.10.0",
+    "pg": "^8.7.3",
+    "twitch-js": "^2.0.0-beta.43"
   },
   "repository": {
     "type": "git",

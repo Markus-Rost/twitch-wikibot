@@ -1,3 +1,4 @@
+/*
 var allSites = [];
 require('./allSites.js')( sites => allSites = sites );
 
@@ -163,3 +164,4 @@ function saveCheckedGames(channel, mention) {
 }
 
 module.exports = checkGames;
+*/

@@ -1,3 +1,4 @@
+/*
 var allSites = [];
 function getAllSites(callback, force = false) {
 	if ( allSites.length && !force && callback ) return callback(allSites);
@@ -9,7 +10,7 @@ function getAllSites(callback, force = false) {
 		else {
 			console.log( '- Sites successfully loaded.' );
 			allSites = JSON.parse(JSON.stringify(body.data.wikis.filter( site => /^[a-z\d-]{1,50}\.gamepedia\.com$/.test(site.wiki_domain) )));
-			allSites.filter( site => site.wiki_crossover ).forEach( site => site.wiki_crossover = site.wiki_crossover.replace( /^(?:https?:)?\/\/(([a-z\d-]{1,50})\.(?:fandom\.com|wikia\.org)(?:(?!\/wiki\/)\/([a-z-]{1,8}))?).*/, '$1' ) );
+			allSites.filter( site => site.wiki_crossover ).forEach( site => site.wiki_crossover = site.wiki_crossover.replace( /^(?:https?:)?\/\/(([a-z\d-]{1,50})\.(?:fandom\.com|wikia\.org)(?:(?!\/wiki\/)\/([a-z-]{1,8}))?).* ?/, '$1' ) );
 			if ( callback ) callback(allSites);
 		}
 	}, error => {
@@ -18,3 +19,4 @@ function getAllSites(callback, force = false) {
 }
 
 module.exports = getAllSites;
+*/

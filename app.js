@@ -1,48 +1,189 @@
-require('dotenv').config();
+import 'dotenv/config';
+import { readdir } from 'node:fs';
+import { domainToASCII } from 'node:url';
+import gotDefault from 'got';
+import { gotSsrf } from 'got-ssrf';
+import { default as TwitchJs, Events } from 'twitch-js';
+import db from './util/database.js';
+import Wiki from './functions/wiki.js';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const {wikiProjects} = require('./functions/default.json');
 
-global.isDebug = ( process.argv[2] === 'debug' );
-var isStop = false;
-const kraken = {
-	Accept: 'application/vnd.twitchtv.v5+json',
-	'Client-ID': process.env.client,
-	Authorization: 'OAuth ' + process.env.oauth
-}
+globalThis.isDebug = ( process.argv[2] === 'debug' );
 
-global.got = require('got').extend( {
+globalThis.got = gotDefault.extend( {
 	throwHttpErrors: false,
-	timeout: 5000,
+	timeout: {
+		request: 30_000
+	},
 	headers: {
-		'user-agent': 'WikiBot/' + ( isDebug ? 'testing' : process.env.npm_package_version ) + ' (Twitch; ' + process.env.npm_package_name + ')'
+		'User-Agent': 'Wiki-Bot/' + ( isDebug ? 'testing' : process.env.npm_package_version ) + ' (Twitch; ' + process.env.npm_package_name + ( process.env.invite ? '; ' + process.env.invite : '' ) + ')'
 	},
 	responseType: 'json'
+}, gotSsrf );
+
+/** @type {TwitchJs} */
+globalThis.client = new TwitchJs.default( {
+	username: process.env.botname,
+	clientId: process.env.client,
+	token: process.env.token,
+	log: {level: 'warn'}
 } );
 
-const sqlite3 = require('sqlite3').verbose();
-global.db = new sqlite3.Database( './wikibot.db', sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, dberror => {
-	if ( dberror ) {
-		console.log( '- Error while connecting to the database: ' + dberror );
-		return dberror;
+client.chat.connect().then( () => {
+	console.log( '- Connected to Twitch.' );
+	db.query( 'SELECT id, name FROM twitch' ).then( ({rows}) => {
+		let channels = new Set();
+		Promise.race([
+			Promise.all(rows.map( row => client.chat.join(row.name).then( () => channels.add(row) ) )),
+			new Promise( resolve => setTimeout(resolve, 300_000) )
+		]).then( () => {
+			console.log( '- Joined ' + channels.size + ' out of ' + rows.length + ' streams.' );
+			if ( channels.size < rows.length ) {
+				let missing = rows.filter( row => !channels.has( row ) ).slice(0, 100);
+				client.api.get( 'channels', {search: {broadcaster_id: missing.map( row => row.id )}} ).then( ({data}) => {
+					Promise.all(data.filter( channel => channel.broadcasterLogin ).map( channel => {
+						let row = missing.find( row => row.id === +channel.broadcasterId );
+						let new_name = channel.broadcasterLogin.toLowerCase();
+						if ( !row || row.name === new_name ) return;
+						return db.query( 'UPDATE twitch SET name = $1 WHERE id = $2', [new_name, row.id] ).then( () => {
+							console.log( '- Updated #' + row.name + ' to #' + new_name + '.' );
+							row.name = new_name;
+						} )
+					} )).then( () => {
+						Promise.race([
+							Promise.all(missing.map( row => client.chat.join(row.name).then( () => channels.add(row) ) )),
+							new Promise( resolve => setTimeout(resolve, 300_000) )
+						]).then( () => {
+							console.log( '- Joined ' + channels.size + ' out of ' + rows.length + ' streams.' );
+							if ( channels.size < rows.length ) {
+								console.log( '- Unable to join: ' + missing.filter( row => !channels.has( row ) ).map( row => '#' + row.name ).join(', ') );
+							}
+						} );
+					}, dberror => {
+						console.log( '- Error while updating the missing channels: ', dberror );
+					} );
+				}, error => {
+					console.log( '- Error while getting the missing channels: ' + error );
+				} );
+			}
+		} );
+	}, dberror => {
+		console.log( '- Error while joining the streams: ', dberror );
+		graceful('DBERROR');
+	} );
+} );
+
+var cmds = {};
+readdir( './cmds', (error, files) => {
+	if ( error ) return error;
+	files.filter( file => file.endsWith('.js') ).forEach( file => {
+		import('./cmds/' + file).then( ({default: command}) => {
+			cmds[command.name] = command.run;
+		} );
+	} );
+} );
+
+var isStop = false;
+var cooldown = {};
+client.chat.on( Events.PRIVATE_MESSAGE, msg => {
+	if ( isStop || msg.isSelf ) return;
+	
+	if ( msg.message.toLowerCase().split(' ')[0] !== process.env.prefix ) return;
+	console.log( msg.channel + ': ' + msg.message );
+	db.query( 'SELECT wiki, restriction, cooldown FROM twitch WHERE id = $1', [msg.tags.roomId] ).then( ({rows: [row]}) => {
+		if ( !row ) {
+			console.log( '- Error while getting the wiki.' );
+			client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I got an error!' );
+			return;
+		}
+		if ( !( msg.tags.isModerator || msg.tags.userId === msg.tags.roomId ) && ( row.restriction === 'moderators' || ( row.restriction === 'subscribers' && ( msg.tags.subscriber <= 0 || msg.tags.badges?.vip ) ) ) ) return console.log( '- ' + msg.channel + ' is restricted.' );
+		if ( ( cooldown[msg.channel] || 0 ) + row.cooldown > Date.now() ) return console.log( '- ' + msg.channel + ' is still on cooldown.' );
+		cooldown[msg.channel] = Date.now();
+		
+		var [invoke, ...args] = msg.message.split(' ').slice(1);
+		if ( invoke ) {
+			invoke = invoke.toLowerCase();
+			if ( cmds.hasOwnProperty(invoke) ) return cmds[invoke](msg, args.join(' ').trim(), wiki);
+			if ( invoke.startsWith( '!' ) && /^![a-z\d-]{1,50}$/.test(invoke) ) {
+				return cmds.LINK(msg, args.join(' '), new Wiki('https://' + invoke.substring(1) + '.gamepedia.com/'));
+			}
+			if ( invoke.startsWith( '?' ) && /^\?(?:[a-z-]{2,12}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
+				let invokeWiki = row.wiki;
+				if ( invoke.includes( '.' ) ) invokeWiki = 'https://' + invoke.split('.')[1] + '.fandom.com/' + invoke.substring(1).split('.')[0] + '/';
+				else invokeWiki = 'https://' + invoke.substring(1) + '.fandom.com/';
+				return cmds.LINK(msg, args.join(' '), new Wiki(invokeWiki));
+			}
+			if ( invoke.startsWith( '??' ) && /^\?\?(?:[a-z-]{2,12}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
+				let invokeWiki = row.wiki;
+				if ( invoke.includes( '.' ) ) invokeWiki = 'https://' + invoke.split('.')[1] + '.wikia.org/' + invoke.substring(2).split('.')[0] + '/';
+				else invokeWiki = 'https://' + invoke.substring(2) + '.wikia.org/';
+				return cmds.LINK(msg, args.join(' '), new Wiki(invokeWiki));
+			}
+			if ( invoke.startsWith( '!!' ) && /^!!(?:[a-z\d-]{1,50}\.)?(?:[a-z\d-]{1,50}\.)?[a-z\d-]{1,50}\.[a-z\d-]{1,10}$/.test(domainToASCII(invoke.split('/')[0])) ) {
+				let project = wikiProjects.find( project => invoke.split('/')[0].endsWith( project.name ) );
+				if ( project ) {
+					let regex = invoke.match( new RegExp( '^!!' + project.regex + '$' ) );
+					if ( regex ) {
+						let scriptPath = project.scriptPath;
+						if ( project.regexPaths ) scriptPath = scriptPath.replace( /\$(\d)/g, (match, n) => regex[n] );
+						return cmds.LINK(msg, args.join(' '), new Wiki('https://' + regex[1] + scriptPath));
+					}
+				}
+			}
+		}
+		cmds.LINK(msg, msg.message.split(' ').slice(1).join(' ').trim(), new Wiki(row.wiki));
+	}, dberror => {
+		console.log( '- Error while getting the wiki: ' + dberror );
+		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I got an error!' );
+	} );
+} );
+
+client.chat.on( Events.WHISPER, msg => {
+	if ( isStop || msg.isSelf ) return;
+	
+	console.log( 'DM - #' + msg.username + ': ' + msg.message );
+	if ( msg.tags.userId === process.env.owner ) {
+		if ( msg.message.startsWith( '#' ) && msg.message.split(' ').length >= 2 ) {
+			client.chat.say( process.env.botname, '/w ' + msg.message.slice(1) );
+		}
 	}
-	console.log( '- Connected to the database.' );
+	else client.chat.say( process.env.botname, '/w ' + process.env.ownername + ' #' + msg.username + ': ' + msg.message );
 } );
 
-const tmi = require('tmi.js');
-global.bot = new tmi.client( {
-	options: {
-		clientId: process.env.client,
-		debug: isDebug
-	},
-	connection: {
-		reconnect: true,
-		secure: true
-	},
-	identity: {
-		username: process.env.botname,
-		password: 'oauth:' + process.env.oauth
-	},
-	channels: []
+client.chat.on( Events.NOTICE, msg => {
+	if ( msg.event === 'HOST_ON' ) return;
+	console.log( msg.channel + ': ' + msg.event + ' - ' + msg.message );
+	if ( msg.event === 'MSG_BANNED' || msg.event === 'MSG_CHANNEL_SUSPENDED' || msg.event === 'MSG_CHANNEL_BLOCKED' || msg.event === 'TOS_BAN' ) {
+		db.query( 'DELETE FROM twitch WHERE name = $1', [msg.channel.substring(1)] ).then( ({rowCount}) => {
+			if ( rowCount ) console.log( '- ' + msg.channel + ' has been removed.' );
+		}, dberror => {
+			console.log( '- Error while removing ' + msg.channel + ': ' + dberror );
+		} );
+	}
 } );
 
+async function graceful(signal) {
+	isStop = true;
+	console.log( '- ' + signal + ': Preparing to close...' );
+	setTimeout( () => {
+		console.log( '- ' + signal + ': Disconnecting from Twitch...' );
+		client.chat.disconnect();
+		db.end().then( () => {
+			console.log( '- ' + signal + ': Closed the database connection.' );
+			process.exit(0);
+		}, dberror => {
+			console.log( '- ' + signal + ': Error while closing the database connection: ' + dberror );
+		} );
+	}, 1_000 ).unref();
+}
+
+process.once( 'SIGINT', graceful );
+process.once( 'SIGTERM', graceful );
+
+
+/*
 const Wiki = require('./functions/wiki.js');
 const checkGames = require('./functions/checkGames.js');
 
@@ -185,98 +326,4 @@ const checkGamesInterval = setInterval( () => {
 		checkGames(channels);
 	} );
 }, 60000 );
-
-const fs = require('fs');
-var cmds = {};
-fs.readdirSync('./cmds').filter( file => file.endsWith('.js') ).forEach( file => {
-	var command = require('./cmds/' + file);
-	cmds[command.name] = command.run;
-} );
-
-bot.on('connected', function(address, port) {
-	console.log( '\n- Successfully logged in!' );
-	getSettings();
-});
-
-var cooldown = {};
-bot.on( 'chat', function(channel, userstate, msg, self) {
-	if ( isStop || self ) return;
-	
-	if ( !( msg.toLowerCase().startsWith( process.env.prefix + ' ' ) || msg.toLowerCase() === process.env.prefix ) ) return;
-	console.log( channel + ': ' + msg );
-	db.get( 'SELECT wiki, restriction, cooldown FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
-		if ( dberror || !row ) {
-			console.log( '- Error while getting the wiki: ' + dberror );
-			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I got an error!' );
-			return dberror;
-		}
-		if ( !( userstate.mod || userstate['user-id'] === userstate['room-id'] || userstate['user-id'] === process.env.owner ) && ( row.restriction === 'moderators' || ( row.restriction === 'subscribers' && !userstate.subscriber ) ) ) return console.log( '- ' + channel + ' is restricted.' );
-		if ( ( cooldown[channel] || 0 ) + row.cooldown > Date.now() ) return console.log( '- ' + channel + ' is still on cooldown.' );
-		cooldown[channel] = Date.now();
-		var wiki = new Wiki(row.wiki);
-		
-		var args = msg.split(' ').slice(1);
-		if ( args[0] ) {
-			var invoke = args[0].toLowerCase();
-			if ( invoke in cmds ) return cmds[invoke](channel, userstate, msg, args.slice(1), wiki);
-			else if ( /^![a-z\d-]{1,50}$/.test(invoke) ) {
-				args = args.slice(1);
-				wiki = new Wiki('https://' + invoke.substring(1) + '.gamepedia.com/');
-			}
-			else if ( /^\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
-				args = args.slice(1);
-				if ( invoke.includes( '.' ) ) wiki = new Wiki('https://' + invoke.split('.')[1] + '.fandom.com/' + invoke.substring(1).split('.')[0] + '/');
-				else wiki = new Wiki('https://' + invoke.substring(1) + '.fandom.com/');
-			}
-			else if ( /^\?\?(?:[a-z-]{1,8}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
-				args = args.slice(1);
-				if ( invoke.includes( '.' ) ) wiki = new Wiki('https://' + invoke.split('.')[1] + '.wikia.org/' + invoke.substring(2).split('.')[0] + '/');
-				else wiki = new Wiki('https://' + invoke.substring(2) + '.wikia.org/');
-			}
-		}
-		cmds.LINK(channel, args.join(' '), wiki);
-	} );
-} );
-
-bot.on( 'whisper', function(channel, userstate, msg, self) {
-	if ( isStop || self ) return;
-	
-	console.log( 'DM - ' + channel + ': ' + msg );
-	if ( channel === '#' + process.env.ownername.toLowerCase() ) {
-		var args = msg.split(' ');
-		if ( args[0].startsWith( '#' ) && args.length >= 2 ) {
-			bot.whisper( args[0], args.splice(1).join(' ') );
-		}
-	}
-	else bot.whisper( process.env.ownername, channel + ': ' + msg );
-} );
-
-bot.on( 'notice', function(channel, msgid, msg) {
-	if ( msgid !== 'host_target_went_offline' ) console.log( channel + ': ' + msg );
-} );
-
-bot.connect().catch( error => console.log( '- Error while connecting: ' + error ) );
-
-async function graceful(signal) {
-	isStop = true;
-	console.log( '- ' + signal + ': Preparing to close...' );
-	clearInterval(checkGamesInterval);
-	setTimeout( async () => {
-		console.log( '- ' + signal + ': Destroying client...' );
-		await bot.disconnect();
-		await db.close( dberror => {
-			if ( dberror ) {
-				console.log( '- ' + signal + ': Error while closing the database connection: ' + dberror );
-				return dberror;
-			}
-			console.log( '- ' + signal + ': Closed the database connection.' );
-		} );
-		setTimeout( async () => {
-			console.log( '- ' + signal + ': Closing takes too long, terminating!' );
-			process.exit(0);
-		}, 2000 ).unref();
-	}, 1000 ).unref();
-}
-
-process.once( 'SIGINT', graceful );
-process.once( 'SIGTERM', graceful );
+*/

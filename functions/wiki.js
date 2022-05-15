@@ -1,13 +1,32 @@
+import { inspect } from 'node:util';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 const {defaultSettings, wikiProjects} = require('./default.json');
 
-var allSites = [];
-require('./allSites.js')( sites => allSites = sites );
+const wikimediaSites = [
+	'wikipedia.org',
+	'mediawiki.org',
+	'wikimedia.org',
+	'wiktionary.org',
+	'wikibooks.org',
+	'wikisource.org',
+	'wikidata.org',
+	'wikiversity.org',
+	'wikiquote.org',
+	'wikinews.org',
+	'wikivoyage.org'
+];
+
+const urlSpaceReplacement = {
+	'https://www.wikihow.com/': '-',
+	'https://wikihow.com/': '-'
+}
 
 /**
  * A wiki.
  * @class Wiki
  */
-class Wiki extends URL {
+export default class Wiki extends URL {
 	/**
 	 * Creates a new wiki.
 	 * @param {String|URL|Wiki} [wiki] - The wiki script path.
@@ -17,16 +36,27 @@ class Wiki extends URL {
 	constructor(wiki = defaultSettings.wiki, base = defaultSettings.wiki) {
 		super(wiki, base);
 		this.protocol = 'https';
-		let articlepath = '/index.php?title=$1';
+		let articlepath = this.pathname + 'index.php?title=$1';
 		if ( this.isFandom() ) articlepath = this.pathname + 'wiki/$1';
+		this.gamepedia = this.hostname.endsWith( '.gamepedia.com' );
 		if ( this.isGamepedia() ) articlepath = '/$1';
 		let project = wikiProjects.find( project => this.hostname.endsWith( project.name ) );
 		if ( project ) {
-			let regex = ( this.host + this.pathname ).match( new RegExp( '^' + project.regex + project.scriptPath + '$' ) );
-			if ( regex ) articlepath = 'https://' + regex[1] + project.articlePath + '$1';
+			let scriptPath = ( project.regexPaths ? '/' : project.scriptPath );
+			let regex = ( this.host + this.pathname ).match( new RegExp( '^' + project.regex + scriptPath + '$' ) );
+			if ( regex ) {
+				let articlePath = project.articlePath;
+				if ( project.regexPaths ) articlePath = articlePath.replace( /\$(\d)/g, (match, n) => regex[n] );
+				articlepath = 'https://' + regex[1] + articlePath + '$1';
+			}
 		}
 		this.articlepath = articlepath;
 		this.mainpage = '';
+		this.mainpageisdomainroot = false;
+		this.miraheze = this.hostname.endsWith( '.miraheze.org' );
+		this.wikimedia = wikimediaSites.includes( this.hostname.split('.').slice(-2).join('.') );
+		this.centralauth = ( ( this.isWikimedia() || this.isMiraheze() ) ? 'CentralAuth' : 'local' );
+		this.spaceReplacement = ( urlSpaceReplacement.hasOwnProperty(this.href) ? urlSpaceReplacement[this.href] : '_' );
 	}
 
 	/**
@@ -52,19 +82,26 @@ class Wiki extends URL {
 	/**
 	 * Updates the wiki url.
 	 * @param {Object} siteinfo - Siteinfo from the wiki API.
-	 * @param {String} siteinfo.server - Server of the wiki with protocol. (For legacy Fandom wikis)
 	 * @param {String} siteinfo.servername - Hostname of the wiki.
 	 * @param {String} siteinfo.scriptpath - Scriptpath of the wiki.
 	 * @param {String} siteinfo.articlepath - Articlepath of the wiki.
 	 * @param {String} siteinfo.mainpage - Main page of the wiki.
+	 * @param {String} siteinfo.centralidlookupprovider - Central auth of the wiki.
+	 * @param {String} siteinfo.logo - Logo of the wiki.
+	 * @param {String} [siteinfo.gamepedia] - If the wiki is a Gamepedia wiki.
 	 * @returns {Wiki}
 	 */
-	updateWiki({server, servername, scriptpath, articlepath, mainpage}) {
-		if ( servername ) this.hostname = servername;
-		else this.hostname = server.replace( /^(?:https?:)?\/\//, '' );
+	updateWiki({servername, scriptpath, articlepath, mainpage, mainpageisdomainroot, centralidlookupprovider, logo, gamepedia = 'false'}) {
+		this.hostname = servername;
 		this.pathname = scriptpath + '/';
 		this.articlepath = articlepath;
 		this.mainpage = mainpage;
+		this.mainpageisdomainroot = ( mainpageisdomainroot !== undefined );
+		this.centralauth = centralidlookupprovider;
+		this.miraheze = /^(?:https?:)?\/\/static\.miraheze\.org\//.test(logo);
+		this.gamepedia = ( gamepedia === 'true' ? true : this.hostname.endsWith( '.gamepedia.com' ) );
+		this.wikimedia = wikimediaSites.includes( this.hostname.split('.').slice(-2).join('.') );
+		this.spaceReplacement = ( urlSpaceReplacement.hasOwnProperty(this.href) ? urlSpaceReplacement[this.href] : this.spaceReplacement );
 		return this;
 	}
 
@@ -75,7 +112,7 @@ class Wiki extends URL {
 	 */
 	isFandom(includeGP = true) {
 		return ( this.hostname.endsWith( '.fandom.com' ) || this.hostname.endsWith( '.wikia.org' )
-		|| ( includeGP && this.hostname.endsWith( '.gamepedia.com' ) ) );
+		|| ( includeGP && this.isGamepedia() ) );
 	}
 
 	/**
@@ -83,7 +120,31 @@ class Wiki extends URL {
 	 * @returns {Boolean}
 	 */
 	isGamepedia() {
-		return this.hostname.endsWith( '.gamepedia.com' );
+		return this.gamepedia;
+	}
+
+	/**
+	 * Check for a Miraheze wiki.
+	 * @returns {Boolean}
+	 */
+	isMiraheze() {
+		return this.miraheze;
+	}
+
+	/**
+	 * Check for a WikiMedia wiki.
+	 * @returns {Boolean}
+	 */
+	isWikimedia() {
+		return this.wikimedia;
+	}
+
+	/**
+	 * Check for CentralAuth.
+	 * @returns {Boolean}
+	 */
+	hasCentralAuth() {
+		return this.centralauth === 'CentralAuth';
 	}
 
 	/**
@@ -111,8 +172,11 @@ class Wiki extends URL {
 	 */
 	toLink(title = '', querystring = '', fragment = '') {
 		querystring = new URLSearchParams(querystring);
-		if ( !querystring.toString().length ) title = ( title || this.mainpage );
-		title = title.replace( / /g, '_' ).replace( /%/g, '%2525' );
+		if ( !querystring.toString().length ) {
+			title = ( title || this.mainpage );
+			if ( this.mainpageisdomainroot && title === this.mainpage ) return this.origin + '/' + Wiki.toSection(fragment, true, this.spaceReplacement);
+		}
+		title = title.replace( / /g, this.spaceReplacement ).replace( /%/g, '%2525' );
 		let link = new URL(this.articleURL);
 		link.pathname = link.pathname.replace( '$1', title.replace( /\\/g, '%5C' ) );
 		link.searchParams.forEach( (value, name, searchParams) => {
@@ -124,18 +188,19 @@ class Wiki extends URL {
 		querystring.forEach( (value, name) => {
 			link.searchParams.append(name, value);
 		} );
-		let output = decodeURI( link ).replace( /\\/g, '%5C' ).replace( /@(here|everyone)/g, '%40$1' ) + Wiki.toSection(fragment);
-		return output;
+		link.hash = Wiki.toSection(fragment, false, this.spaceReplacement);
+		return link.href;
 	}
 
 	/**
 	 * Encode a page title.
 	 * @param {String} [title] - Title of the page.
+	 * @param {String} [spaceReplacement] - The url replacement for spaces.
 	 * @returns {String}
 	 * @static
 	 */
-	static toTitle(title = '') {
-		return title.replace( / /g, '_' ).replace( /[?&%\\]/g, (match) => {
+	static toTitle(title = '', spaceReplacement = '_') {
+		return title.replace( / /g, spaceReplacement ).replace( /[?&%\\]/g, (match) => {
 			return '%' + match.charCodeAt().toString(16).toUpperCase();
 		} ).replace( /@(here|everyone)/g, '%40$1' ).replace( /[()]/g, '\\$&' );
 	};
@@ -143,13 +208,15 @@ class Wiki extends URL {
 	/**
 	 * Encode a link section.
 	 * @param {String} [fragment] - Fragment of the page.
+	 * @param {Boolean} [simpleEncoding] - Don't fully encode the anchor.
+	 * @param {String} [spaceReplacement] - The url replacement for spaces.
 	 * @returns {String}
 	 * @static
 	 */
-	static toSection(fragment = '') {
+	static toSection(fragment = '', simpleEncoding = true, spaceReplacement = '_') {
 		if ( !fragment ) return '';
-		fragment = fragment.replace( / /g, '_' );
-		if ( !/['"`^{}<>|\\]|@(everyone|here)/.test(fragment) ) return '#' + fragment;
+		fragment = fragment.replace( / /g, spaceReplacement );
+		if ( simpleEncoding && !/['"`^{}<>|\\]|@(everyone|here)/.test(fragment) ) return '#' + fragment;
 		return '#' + encodeURIComponent( fragment ).replace( /[!'()*~]/g, (match) => {
 			return '%' + match.charCodeAt().toString(16).toUpperCase();
 		} ).replace( /%3A/g, ':' ).replace( /%/g, '.' );
@@ -158,37 +225,73 @@ class Wiki extends URL {
 	/**
 	 * Turn user input into a wiki.
 	 * @param {String} input - The user input referring to a wiki.
-	 * @returns {Wiki}
+	 * @returns {Wiki?}
 	 * @static
 	 */
 	static fromInput(input = '') {
-		if ( input instanceof URL ) return new this(input);
-		input = input.replace( /^(?:https?:)?\/\//, 'https://' );
-		var regex = input.match( /^(?:https:\/\/)?([a-z\d-]{1,50}\.(?:gamepedia\.com|(?:fandom\.com|wikia\.org)(?:(?!\/(?:wiki|api)\/)\/[a-z-]{2,12})?))(?:\/|$)/ );
-		if ( regex ) return new this('https://' + regex[1] + '/');
-		if ( input.startsWith( 'https://' ) ) {
-			let project = wikiProjects.find( project => input.split('/')[2].endsWith( project.name ) );
-			if ( project ) {
-				regex = input.match( new RegExp( project.regex + `(?:${project.articlePath}|${project.scriptPath}|/?$)` ) );
-				if ( regex ) return new this('https://' + regex[1] + project.scriptPath);
+		try {
+			if ( input instanceof URL ) return new Wiki(input);
+			input = input.replace( /^(?:https?:)?\/\//, 'https://' );
+			var regex = input.match( /^(?:https:\/\/)?([a-z\d-]{1,50}\.(?:gamepedia\.com|(?:fandom\.com|wikia\.org)(?:(?!\/(?:wiki|api)\/)\/[a-z-]{2,12})?))(?:\/|$)/ );
+			if ( regex ) return new Wiki('https://' + regex[1] + '/');
+			if ( input.startsWith( 'https://' ) ) {
+				let project = wikiProjects.find( project => input.split('/')[2].endsWith( project.name ) );
+				if ( project ) {
+					let articlePath = ( project.regexPaths ? '/' : project.articlePath );
+					let scriptPath = ( project.regexPaths ? '/' : project.scriptPath );
+					regex = input.match( new RegExp( project.regex + `(?:${articlePath}|${scriptPath}|/?$)` ) );
+					if ( regex ) {
+						if ( project.regexPaths ) scriptPath = project.scriptPath.replace( /\$(\d)/g, (match, n) => regex[n] );
+						return new Wiki('https://' + regex[1] + scriptPath);
+					}
+				}
+				let wiki = input.replace( /\/(?:index|api|load|rest)\.php(?:|[\?\/#].*)$/, '/' );
+				if ( !wiki.endsWith( '/' ) ) wiki += '/';
+				return new Wiki(wiki);
 			}
-			let wiki = input.replace( /\/(?:api|load|index)\.php(?:|\?.*)$/, '/' );
-			if ( !wiki.endsWith( '/' ) ) wiki += '/';
-			return new this(wiki);
+			let project = wikiProjects.find( project => input.split('/')[0].endsWith( project.name ) );
+			if ( project ) {
+				let articlePath = ( project.regexPaths ? '/' : project.articlePath );
+				let scriptPath = ( project.regexPaths ? '/' : project.scriptPath );
+				regex = input.match( new RegExp( project.regex + `(?:${articlePath}|${scriptPath}|/?$)` ) );
+				if ( regex ) {
+					if ( project.regexPaths ) scriptPath = project.scriptPath.replace( /\$(\d)/g, (match, n) => regex[n] );
+					return new Wiki('https://' + regex[1] + scriptPath);
+				}
+			}
+			if ( /^(?:[a-z-]{2,12}\.)?[a-z\d-]{1,50}$/.test(input) ) {
+				if ( !input.includes( '.' ) ) return new Wiki('https://' + input + '.fandom.com/');
+				else return new Wiki('https://' + input.split('.')[1] + '.fandom.com/' + input.split('.')[0] + '/');
+			}
+			return null;
 		}
-		let project = wikiProjects.find( project => input.split('/')[0].endsWith( project.name ) );
-		if ( project ) {
-			regex = input.match( new RegExp( project.regex + `(?:${project.articlePath}|${project.scriptPath}|/?$)` ) );
-			if ( regex ) return new this('https://' + regex[1] + project.scriptPath);
+		catch {
+			return null;
 		}
-		if ( allSites.some( site => site.wiki_domain === input + '.gamepedia.com' ) ) {
-			return new this('https://' + input + '.gamepedia.com/');
+	}
+
+	[inspect.custom](depth, opts) {
+		if ( typeof depth === 'number' && depth < 0 ) return this;
+		const wiki = {
+			href: this.href,
+			origin: this.origin,
+			protocol: this.protocol,
+			username: this.username,
+			password: this.password,
+			host: this.host,
+			hostname: this.hostname,
+			port: this.port,
+			pathname: this.pathname,
+			search: this.search,
+			searchParams: this.searchParams,
+			hash: this.hash,
+			articlepath: this.articlepath,
+			articleURL: this.articleURL,
+			spaceReplacement: this.spaceReplacement,
+			mainpage: this.mainpage,
+			mainpageisdomainroot: this.mainpageisdomainroot,
 		}
-		if ( /^(?:[a-z-]{2,12}\.)?[a-z\d-]{1,50}$/.test(input) ) {
-			if ( !input.includes( '.' ) ) return new this('https://' + input + '.fandom.com/');
-			else return new this('https://' + input.split('.')[1] + '.fandom.com/' + input.split('.')[0] + '/');
-		}
-		return null;
+		return 'Wiki ' + inspect(wiki, opts);
 	}
 }
 
@@ -200,14 +303,29 @@ class articleURL extends URL {
 	/**
 	 * Creates a new article URL.
 	 * @param {String|URL|Wiki} [articlepath] - The article path.
-	 * @param {String|URL|Wiki} [wiki] - The wiki.
+	 * @param {Wiki} [wiki] - The wiki.
 	 * @constructs articleURL
 	 */
 	constructor(articlepath = '/index.php?title=$1', wiki) {
 		super(articlepath, wiki);
 		this.protocol = 'https';
+		this.username = '';
+		this.password = '';
 		this.mainpage = '';
+		this.spaceReplacement = ( wiki?.spaceReplacement || '_' );
+	}
+
+	[inspect.custom](depth, opts) {
+		if ( typeof depth === 'number' && depth < 0 ) return this;
+		if ( typeof depth === 'number' && depth < 2 ) {
+			var link = this.href;
+			var mainpage = link.replace( '$1', Wiki.toTitle(( this.mainpage || 'Main Page' ), this.spaceReplacement) );
+			return 'articleURL { ' + inspect(link, opts) + ' => ' + inspect(mainpage, opts) + ' }';
+		}
+		return super[inspect.custom](depth, opts);
 	}
 }
 
-module.exports = Wiki;
+export const toTitle = Wiki.toTitle;
+export const toSection = Wiki.toSection;
+export const fromInput = Wiki.fromInput;

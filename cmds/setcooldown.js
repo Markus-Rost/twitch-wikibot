@@ -1,28 +1,31 @@
-function cmd_setcooldown(channel, userstate, msg, args, wiki) {
-	if ( /^(|\d+)$/.test(args.join(' ')) && ( userstate.mod || userstate['user-id'] === userstate['room-id'] || userstate['user-id'] === process.env.owner ) ) {
-		if ( args.join(' ').length ) db.run( 'UPDATE twitch SET cooldown = ? WHERE id = ?', [args[0] + '000', userstate['room-id']], function (dberror) {
-			if ( dberror ) {
-				console.log( '- Error while editing the settings: ' + dberror );
-				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t set the cooldown :(' );
-				return dberror;
-			}
-			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I set the cooldown to ' + args[0] + ' seconds.' );
-			console.log( '- Settings successfully updated.' );
-		} );
-		else db.get( 'SELECT cooldown FROM twitch WHERE id = ?', [userstate['room-id']], (dberror, row) => {
-			if ( dberror || !row ) {
-				console.log( '- Error while getting the cooldown: ' + dberror );
-				bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t get the cooldown :(' );
-				return dberror;
-			}
-			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', the cooldown is set to ' + ( row.cooldown / 1000 ) + ' seconds.' );
-		} );
-	} else {
-		this.LINK(channel, msg.split(' ').slice(1).join(' '), wiki);
+import db from '../util/database.js';
+
+/**
+ * Processes the "setcooldown" command.
+ * @param {import('twitch-js').PrivateMessages} msg - The chat message.
+ * @param {String} text - The command.
+ * @param {Wiki} wiki - The wiki for the message.
+ */
+function cmd_setcooldown(msg, text, wiki) {
+	if ( !/^(|\d+)$/.test(text) || !( msg.tags.isModerator || msg.tags.userId === msg.tags.roomId ) ) {
+		return this.LINK(msg.channel, msg.message.split(' ').slice(1).join(' ').trim(), wiki);
 	}
+	if ( text.length ) db.query( 'UPDATE twitch SET cooldown = $1 WHERE id = $2', [text + '000', msg.tags.roomId] ).then( () => {
+		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I set the cooldown to ' + text + ' seconds.' );
+		console.log( '- Cooldown successfully updated.' );
+	}, dberror => {
+		console.log( '- Error while setting the cooldown: ' + dberror );
+		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I couldn\'t set the cooldown :(' );
+	} );
+	else db.query( 'SELECT cooldown FROM twitch WHERE id = $1', [msg.tags.roomId] ).then( ({rows: [row]}) => {
+		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', the cooldown is set to ' + ( row?.cooldown / 1000 ) + ' seconds.' );
+	}, dberror => {
+		console.log( '- Error while getting the cooldown: ' + dberror );
+		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I couldn\'t get the cooldown :(' );
+	} );
 }
 
-module.exports = {
+export default {
 	name: 'setcooldown',
 	run: cmd_setcooldown
 };

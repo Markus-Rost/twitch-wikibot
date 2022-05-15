@@ -1,48 +1,25 @@
-const checkGames = require('../functions/checkGames.js');
+import db from '../util/database.js';
 
-const kraken = {
-	Accept: 'application/vnd.twitchtv.v5+json',
-	'Client-ID': process.env.client,
-	Authorization: 'OAuth ' + process.env.oauth
+/**
+ * Processes the "join" command.
+ * @param {import('twitch-js').PrivateMessages} msg - The chat message.
+ * @param {String} text - The command.
+ * @param {Wiki} wiki - The wiki for the message.
+ */
+function cmd_join(msg, text, wiki) {
+	if ( text.toLowerCase().replace( /^@/, '' ) !== msg.username ) return this.LINK(msg.channel, msg.message.split(' ').slice(1).join(' ').trim(), wiki);
+	db.query( 'INSERT INTO twitch(id, name, wiki) VALUES($1, $2, $3) ON CONFLICT DO NOTHING', [msg.tags.userId, msg.username, wiki.href] ).then( ({rowCount}) => {
+		if ( !rowCount ) return client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I already joined your stream.' );
+		console.log( '- I\'ve been added to a stream.' );
+		client.chat.join(msg.username);
+		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I joined your stream.' );
+	}, dberror => {
+		console.log( '- Error while adding the settings: ' + dberror );
+		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I couldn\'t join your stream :(' );
+	} );
 }
 
-function cmd_join(channel, userstate, msg, args, wiki) {
-	if ( args.join(' ').toLowerCase().replace( /^@/, '' ) === userstate.username ) {
-		db.run( 'INSERT INTO twitch(id, name, wiki) VALUES(?, ?, ?)', [userstate['user-id'], userstate.username, wiki.href], function (dberror) {
-			if ( dberror ) {
-				if ( dberror.message === 'SQLITE_CONSTRAINT: UNIQUE constraint failed: twitch.id' ) {
-					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I already joined your stream.' );
-				} else {
-					console.log( '- Error while adding the settings: ' + dberror );
-					bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I couldn\'t join your stream :(' );
-				}
-				return dberror;
-			}
-			console.log( '- I\'ve been added to a stream.' );
-			bot.join(userstate.username);
-			bot.say( channel, 'gamepediaWIKIBOT @' + userstate['display-name'] + ', I joined your stream.' );
-			
-			checkGames([{id:parseInt(userstate['user-id'], 10),game:null}], [userstate.username,userstate['display-name']]);
-			
-			got.put( 'https://api.twitch.tv/kraken/users/' + process.env.bot + '/follows/channels/' + userstate['user-id'], {
-				headers: kraken
-			} ).then( response => {
-				var body = response.body;
-				if ( response.statusCode !== 200 || !body || body.error ) {
-					bot.whisper( process.env.ownername, 'Error while following ' + userstate['display-name'] );
-					console.log( '- ' + response.statusCode + ': Error while following ' + userstate['display-name'] + ': ' + ( body && ( body.message || body.error ) ) );
-				} else console.log( '- I\'m now following ' + userstate['display-name'] + '.' );
-			}, error => {
-				bot.whisper( process.env.ownername, 'Error while following ' + userstate['display-name'] );
-				console.log( '- Error while following ' + userstate['display-name'] + ': ' + error );
-			} );
-		} );
-	} else {
-		this.LINK(channel, msg.split(' ').slice(1).join(' '), wiki);
-	}
-}
-
-module.exports = {
+export default {
 	name: 'join',
 	run: cmd_join
 };
