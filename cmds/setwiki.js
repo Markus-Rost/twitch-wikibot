@@ -1,4 +1,5 @@
 import { load } from 'cheerio';
+import db from '../util/database.js';
 import Wiki from '../functions/wiki.js';
 //import checkGames from '../functions/checkGames.js';
 
@@ -63,7 +64,7 @@ function cmd_setwiki(msg, text, wiki) {
 			client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', the wiki has to use at least MediaWiki 1.30!' );
 			return;
 		}
-		return db.run( 'UPDATE twitch SET wiki = $1 WHERE id = $2', [wikinew.href, msg.tags.roomId] ).then( () => {
+		return db.query( 'UPDATE twitch SET wiki = $1 WHERE id = $2', [wikinew.href, msg.tags.roomId] ).then( () => {
 			console.log( '- Wiki successfully updated.' );
 			client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I changed the default wiki to: ' + wikinew.toLink() );
 		}, dberror => {

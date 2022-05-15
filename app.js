@@ -134,9 +134,12 @@ client.chat.on( Events.PRIVATE_MESSAGE, msg => {
 				}
 			}
 		}
-		cmds.LINK(msg, msg.message.split(' ').slice(1).join(' ').trim(), wiki);
+		return cmds.LINK(msg, msg.message.split(' ').slice(1).join(' ').trim(), wiki);
 	}, dberror => {
 		console.log( '- Error while getting the wiki: ' + dberror );
+		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I got an error!' );
+	} ).catch( error => {
+		console.log( '- Error while processing the command: ' + error );
 		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I got an error!' );
 	} );
 } );
