@@ -101,7 +101,8 @@ client.chat.on( Events.PRIVATE_MESSAGE, msg => {
 		if ( !( msg.tags.isModerator || msg.tags.userId === msg.tags.roomId ) && ( row.restriction === 'moderators' || ( row.restriction === 'subscribers' && ( msg.tags.subscriber <= 0 || msg.tags.badges?.vip ) ) ) ) return console.log( '- ' + msg.channel + ' is restricted.' );
 		if ( ( cooldown[msg.channel] || 0 ) + row.cooldown > Date.now() ) return console.log( '- ' + msg.channel + ' is still on cooldown.' );
 		cooldown[msg.channel] = Date.now();
-		
+
+		var wiki = new Wiki(row.wiki)
 		var [invoke, ...args] = msg.message.split(' ').slice(1);
 		if ( invoke ) {
 			invoke = invoke.toLowerCase();
@@ -110,13 +111,13 @@ client.chat.on( Events.PRIVATE_MESSAGE, msg => {
 				return cmds.LINK(msg, args.join(' '), new Wiki('https://' + invoke.substring(1) + '.gamepedia.com/'));
 			}
 			if ( invoke.startsWith( '?' ) && /^\?(?:[a-z-]{2,12}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
-				let invokeWiki = row.wiki;
+				let invokeWiki = wiki.href;
 				if ( invoke.includes( '.' ) ) invokeWiki = 'https://' + invoke.split('.')[1] + '.fandom.com/' + invoke.substring(1).split('.')[0] + '/';
 				else invokeWiki = 'https://' + invoke.substring(1) + '.fandom.com/';
 				return cmds.LINK(msg, args.join(' '), new Wiki(invokeWiki));
 			}
 			if ( invoke.startsWith( '??' ) && /^\?\?(?:[a-z-]{2,12}\.)?[a-z\d-]{1,50}$/.test(invoke) ) {
-				let invokeWiki = row.wiki;
+				let invokeWiki = wiki.href;
 				if ( invoke.includes( '.' ) ) invokeWiki = 'https://' + invoke.split('.')[1] + '.wikia.org/' + invoke.substring(2).split('.')[0] + '/';
 				else invokeWiki = 'https://' + invoke.substring(2) + '.wikia.org/';
 				return cmds.LINK(msg, args.join(' '), new Wiki(invokeWiki));
@@ -133,7 +134,7 @@ client.chat.on( Events.PRIVATE_MESSAGE, msg => {
 				}
 			}
 		}
-		cmds.LINK(msg, msg.message.split(' ').slice(1).join(' ').trim(), new Wiki(row.wiki));
+		cmds.LINK(msg, msg.message.split(' ').slice(1).join(' ').trim(), wiki);
 	}, dberror => {
 		console.log( '- Error while getting the wiki: ' + dberror );
 		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I got an error!' );
