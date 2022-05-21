@@ -157,7 +157,7 @@ client.chat.on( Events.WHISPER, msg => {
 } );
 
 client.chat.on( Events.NOTICE, msg => {
-	if ( msg.event === 'HOST_ON' ) return;
+	if ( msg.event === 'HOST_ON' || msg.event === 'HOST_TARGET_WENT_OFFLINE' ) return;
 	console.log( msg.channel + ': ' + msg.event + ' - ' + msg.message );
 	if ( msg.event === 'MSG_BANNED' || msg.event === 'MSG_CHANNEL_SUSPENDED' || msg.event === 'MSG_CHANNEL_BLOCKED' || msg.event === 'TOS_BAN' ) {
 		db.query( 'DELETE FROM twitch WHERE name = $1', [msg.channel.substring(1)] ).then( ({rowCount}) => {
