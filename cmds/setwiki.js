@@ -34,7 +34,7 @@ function cmd_setwiki(msg, text, wiki) {
 	if ( !wikinew ) return client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', please provide a valid wiki URL!' );
 	return got.get( wikinew + 'api.php?&action=query&meta=siteinfo&siprop=general&format=json' ).then( response => {
 		if ( response.statusCode === 404 && typeof response.body === 'string' ) {
-			let api = load(response.body)('head link[rel="EditURI"]').prop('href');
+			let api = load(response.body, {baseURI: response.url})('head link[rel="EditURI"]').prop('href');
 			if ( api ) {
 				wikinew = new Wiki(api.split('api.php?')[0], wikinew);
 				return got.get( wikinew + 'api.php?action=query&meta=siteinfo&siprop=general&format=json' );
