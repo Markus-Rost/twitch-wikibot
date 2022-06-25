@@ -1,9 +1,7 @@
+import { wikiProjects } from 'mediawiki-projects-list';
 import cmd_random from '../functions/random.js';
 import parse_page from '../functions/parse_page.js';
 import Wiki, { toSection } from '../functions/wiki.js';
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const {wikiProjects} = require('../functions/default.json');
 
 function cmd_link(msg, title, wiki, querystring = new URLSearchParams(), fragment = '', interwiki = '') {
 	if ( title.includes( '#' ) ) {
@@ -45,6 +43,11 @@ function cmd_link(msg, title, wiki, querystring = new URLSearchParams(), fragmen
 				delete querypage.missing;
 				querypage.ns = -1;
 				querypage.special = '';
+			}
+			if ( wiki.wikifarm === 'miraheze' && querypage.ns === 0 && /^Mh:[a-z\d]+:/.test(querypage.title) ) {
+				var iw_parts = querypage.title.split(':');
+				var iw = new Wiki('https://' + iw_parts[1] + '.miraheze.org/w/');
+				return cmd_link(msg, iw_parts.slice(2).join(':'), iw, querystring, fragment, iw.toLink(iw_parts.slice(2).join(':'), querystring, fragment));
 			}
 			if ( ( querypage.missing !== undefined && querypage.known === undefined ) || querypage.invalid !== undefined ) return got.get( wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&explaintext=true&exintro=true&exlimit=1&generator=search&gsrnamespace=4|12|14|' + ( querypage.ns >= 0 ? querypage.ns + '|' : '' ) + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrlimit=1&gsrsearch=' + encodeURIComponent( title ) + '&format=json' ).then( srresponse => {
 				var srbody = srresponse.body;
@@ -106,7 +109,7 @@ function cmd_link(msg, title, wiki, querystring = new URLSearchParams(), fragmen
 				if ( iw.hostname.endsWith( '.gamepedia.com' ) ) {
 					let iwtitle = decodeURIComponent( iw.pathname.substring(1) ).replace( /_/g, ' ' );
 					cmd = '!' + iw.hostname.replace( '.gamepedia.com', ' ' );
-					if ( cmd !== '!www ' ) return cmd_link(msg.channel, iwtitle, new Wiki(iw.origin), iw.searchParams, fragment, iw.href);
+					if ( cmd !== '!www ' ) return cmd_link(msg, iwtitle, new Wiki(iw.origin), iw.searchParams, fragment, iw.href);
 				}
 				if ( iw.hostname.endsWith( '.fandom.com' ) || iw.hostname.endsWith( '.wikia.org' ) ) {
 					let regex = iw.pathname.match( /^(\/(?!wiki\/)[a-z-]{2,12})?(?:\/wiki\/|\/?$)/ );
@@ -114,16 +117,19 @@ function cmd_link(msg, title, wiki, querystring = new URLSearchParams(), fragmen
 						let path = ( regex[1] || '' );
 						let iwtitle = decodeURIComponent( iw.pathname.replace( regex[0], '' ) ).replace( /_/g, ' ' );
 						cmd = ( iw.hostname.endsWith( '.wikia.org' ) ? '??' : '?' ) + ( path ? path.substring(1) + '.' : '' ) + iw.hostname.replace( /\.(?:fandom\.com|wikia\.org)/, ' ' );
-						return cmd_link(msg.channel, iwtitle, new Wiki(iw.origin + path + '/'), iw.searchParams, fragment, iw.href);
+						return cmd_link(msg, iwtitle, new Wiki(iw.origin + path + '/'), iw.searchParams, fragment, iw.href);
 					}
 				}
 				let project = wikiProjects.find( project => iw.hostname.endsWith( project.name ) );
 				if ( project ) {
-					let regex = ( iw.host + iw.pathname ).match( new RegExp( '^' + project.regex + '(?:' + project.articlePath + '|/?$)' ) );
+					let articlePath = ( project.regexPaths ? '/' : project.articlePath );
+					let regex = ( iw.host + iw.pathname ).match( new RegExp( '^' + project.regex + '(?:' + articlePath + '|/?$)' ) );
 					if ( regex ) {
 						let iwtitle = decodeURIComponent( ( iw.host + iw.pathname ).replace( regex[0], '' ) ).replace( /_/g, ' ' );
 						cmd = '!!' + regex[1] + ' ';
-						return cmd_link(msg.channel, iwtitle, new Wiki('https://' + regex[1] + project.scriptPath), iw.searchParams, fragment, iw.href);
+						let scriptPath = project.scriptPath;
+						if ( project.regexPaths ) scriptPath = scriptPath.replace( /\$(\d)/g, (match, n) => regex[n] );
+						return cmd_link(msg, iwtitle, new Wiki('https://' + regex[1] + scriptPath), iw.searchParams, fragment, iw.href);
 					}
 				}
 			}

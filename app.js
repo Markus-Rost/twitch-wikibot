@@ -4,11 +4,9 @@ import { domainToASCII } from 'node:url';
 import gotDefault from 'got';
 import { gotSsrf } from 'got-ssrf';
 import { default as TwitchJs, Events } from 'twitch-js';
+import { inputToWikiProject } from 'mediawiki-projects-list';
 import db from './util/database.js';
 import Wiki from './functions/wiki.js';
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const {wikiProjects} = require('./functions/default.json');
 
 globalThis.isDebug = ( process.argv[2] === 'debug' );
 
@@ -123,15 +121,8 @@ client.chat.on( Events.PRIVATE_MESSAGE, msg => {
 				return cmds.LINK(msg, args.join(' '), new Wiki(invokeWiki));
 			}
 			if ( invoke.startsWith( '!!' ) && /^!!(?:[a-z\d-]{1,50}\.)?(?:[a-z\d-]{1,50}\.)?[a-z\d-]{1,50}\.[a-z\d-]{1,10}$/.test(domainToASCII(invoke.split('/')[0])) ) {
-				let project = wikiProjects.find( project => invoke.split('/')[0].endsWith( project.name ) );
-				if ( project ) {
-					let regex = invoke.match( new RegExp( '^!!' + project.regex + '$' ) );
-					if ( regex ) {
-						let scriptPath = project.scriptPath;
-						if ( project.regexPaths ) scriptPath = scriptPath.replace( /\$(\d)/g, (match, n) => regex[n] );
-						return cmds.LINK(msg, args.join(' '), new Wiki('https://' + regex[1] + scriptPath));
-					}
-				}
+				let project = inputToWikiProject(invoke.slice(2));
+				if ( project ) return cmdmap.LINK(msg, args.join(' '), new Wiki(project.fullScriptPath));
 			}
 		}
 		return cmds.LINK(msg, msg.message.split(' ').slice(1).join(' ').trim(), wiki);
