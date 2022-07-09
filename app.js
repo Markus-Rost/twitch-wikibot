@@ -26,6 +26,18 @@ globalThis.client = new TwitchJs.default( {
 	username: process.env.botname,
 	clientId: process.env.client,
 	token: process.env.token,
+	onAuthenticationFailure: () => {
+		console.log( '- Authentication failed.' );
+		return got.post( 'https://id.twitch.tv/oauth2/token', {
+			form: {
+				grant_type: 'refresh_token',
+				refresh_token: process.env.refresh,
+				client_id: process.env.client,
+				client_secret: process.env.secret
+			},
+			throwHttpErrors: true
+		}).then( ({body}) => body.accessToken, error => console.log( '- Error during Authentication:', error ) );
+	},
 	log: {level: 'warn'}
 } );
 
