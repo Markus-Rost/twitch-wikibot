@@ -36,7 +36,11 @@ globalThis.client = new TwitchJs.default( {
 				client_secret: process.env.secret
 			},
 			throwHttpErrors: true
-		}).then( ({body}) => body.accessToken, error => console.log( '- Error during Authentication:', error ) );
+		}).then( ({body}) => {
+			process.env.refresh = body.refresh_token;
+			process.env.token = body.access_token;
+			return body.access_token;
+		}, error => console.log( '- Error during Authentication:', error ) );
 	},
 	log: {level: 'warn'}
 } );
