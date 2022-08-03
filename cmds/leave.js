@@ -11,12 +11,12 @@ function cmd_leave(msg, text, wiki) {
 		return this.LINK(msg.channel, msg.message.split(' ').slice(1).join(' ').trim(), wiki);
 	}
 	db.query( 'DELETE FROM twitch WHERE id = $1', [msg.tags.roomId] ).then( () => {
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I will leave your stream now.' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', I will leave your stream now.' );
 		console.log( '- I\'ve been removed from a stream.' );
 		client.chat.part(msg.username);
 	}, dberror => {
 		console.log( '- Error while removing the settings: ' + dberror );
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I couldn\'t leave your stream :(' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', I couldn\'t leave your stream :(' );
 	} );
 }
 

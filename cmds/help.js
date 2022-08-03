@@ -6,7 +6,7 @@
  */
 function cmd_help(msg, text, wiki) {
 	if ( text.length ) return this.LINK(msg, msg.message.split(' ').slice(1).join(' ').trim(), wiki);
-	client.chat.say( msg.channel, 'gamepediaWIKIBOT WikiBot is a Twitch chat bot with the purpose to easily link to Gamepedia and Fandom wikis, for a list of all chat commands see the Twitch page: https://www.twitch.tv/WikiBot/about' );
+	client.chat.say( msg.channel, 'WikiBot is a Twitch chat bot with the purpose to easily link to Gamepedia and Fandom wikis, for a list of all chat commands see the Twitch page: https://www.twitch.tv/WikiBot/about' );
 }
 
 export default {

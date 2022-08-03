@@ -32,10 +32,17 @@ function parse_page(channel, text, wiki, {title}) {
 			return;
 		}
 		var $ = load(response.body.parse.text['*'].replace( /<br\/?>/g, '\n' ));
+		var backupDescription = '';
+		if ( wiki.hostname === 'wikimon.net' ) {
+			let wikimonDesc = $('#pnDigimonRefBookMultiMorphContent1 td').first();
+			wikimonDesc.find('.pnDigimonRefBookMultiMorphLink2').remove();
+			backupDescription = wikimonDesc.prop('innerText')?.trim();
+		}
 		$('h1, h2, h3, h4, h5, h6').nextAll().remove();
 		$('h1, h2, h3, h4, h5, h6').remove();
 		$(removeClasses.join(', '), $('.mw-parser-output')).not(keepMainPageTag.join(', ')).remove();
 		var description = $.root().prop('innerText')?.trim();
+		if ( !description ) description = backupDescription;
 		if ( description ) text += ' – ' + description;
 		client.chat.say( channel, ( text.length < 450 ? text : text.substring(0, 450) + '\u2026' ) );
 	}, error => {

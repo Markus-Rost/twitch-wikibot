@@ -19,7 +19,7 @@ function checkGames(channels, mention) {
 		var body = response.body;
 		if ( response.statusCode !== 200 || !body || body.error || !body.channels ) {
 			console.log( '- ' + response.statusCode + ': Error while checking games: ' + ( body && ( body.message || body.error ) ) );
-			if ( mention ) bot.say( mention[0], 'gamepediaWIKIBOT @' + mention[1] + ', I couldn\'t start changing the default wiki automatically :(' );
+			if ( mention ) bot.say( mention[0], '@' + mention[1] + ', I couldn\'t start changing the default wiki automatically :(' );
 		}
 		else {
 			var updated = body.channels.filter( user => user.game !== channels.find( channel => channel.id === user._id ).game );
@@ -141,7 +141,7 @@ function checkGames(channels, mention) {
 		}
 	}, error => {
 		console.log( '- Error while checking games: ' + error );
-		if ( mention ) bot.say( mention[0], 'gamepediaWIKIBOT @' + mention[1] + ', I couldn\'t start changing the default wiki automatically :(' );
+		if ( mention ) bot.say( mention[0], '@' + mention[1] + ', I couldn\'t start changing the default wiki automatically :(' );
 	} );
 }
 
@@ -155,11 +155,11 @@ function saveCheckedGames(channel, mention) {
 	db.run( sql, args, function (dberror) {
 		if ( dberror ) {
 			console.log( '- Error while updating the game for #' + channel.name + ': ' + dberror );
-			if ( mention ) bot.say( mention[0], 'gamepediaWIKIBOT @' + mention[1] + ', I couldn\'t start changing the default wiki automatically :(' );
+			if ( mention ) bot.say( mention[0], '@' + mention[1] + ', I couldn\'t start changing the default wiki automatically :(' );
 			return dberror;
 		}
 		console.log( '- Game successfully updated for #' + channel.name );
-		bot.say( channel.name, 'gamepediaWIKIBOT ' + ( mention ? '@' + mention[1] + ', ' : '' ) + channel.text + ( channel.wiki || '' ) );
+		bot.say( channel.name, ( mention ? '@' + mention[1] + ', ' : '' ) + channel.text + ( channel.wiki || '' ) );
 	} );
 }
 

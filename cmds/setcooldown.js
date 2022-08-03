@@ -11,17 +11,17 @@ function cmd_setcooldown(msg, text, wiki) {
 		return this.LINK(msg.channel, msg.message.split(' ').slice(1).join(' ').trim(), wiki);
 	}
 	if ( text.length ) db.query( 'UPDATE twitch SET cooldown = $1 WHERE id = $2', [text + '000', msg.tags.roomId] ).then( () => {
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I set the cooldown to ' + text + ' seconds.' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', I set the cooldown to ' + text + ' seconds.' );
 		console.log( '- Cooldown successfully updated.' );
 	}, dberror => {
 		console.log( '- Error while setting the cooldown: ' + dberror );
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I couldn\'t set the cooldown :(' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', I couldn\'t set the cooldown :(' );
 	} );
 	else db.query( 'SELECT cooldown FROM twitch WHERE id = $1', [msg.tags.roomId] ).then( ({rows: [row]}) => {
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', the cooldown is set to ' + ( row?.cooldown / 1000 ) + ' seconds.' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', the cooldown is set to ' + ( row?.cooldown / 1000 ) + ' seconds.' );
 	}, dberror => {
 		console.log( '- Error while getting the cooldown: ' + dberror );
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I couldn\'t get the cooldown :(' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', I couldn\'t get the cooldown :(' );
 	} );
 }
 

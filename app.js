@@ -109,7 +109,7 @@ client.chat.on( Events.PRIVATE_MESSAGE, msg => {
 	db.query( 'SELECT wiki, restriction, cooldown FROM twitch WHERE id = $1', [msg.tags.roomId] ).then( ({rows: [row]}) => {
 		if ( !row ) {
 			console.log( '- Error while getting the wiki.' );
-			client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I got an error!' );
+			client.chat.say( msg.channel, '@' + msg.tags.displayName + ', I got an error!' );
 			return;
 		}
 		if ( !( msg.tags.isModerator || msg.tags.userId === msg.tags.roomId ) && ( row.restriction === 'moderators' || ( row.restriction === 'subscribers' && ( msg.tags.subscriber <= 0 || msg.tags.badges?.vip ) ) ) ) return console.log( '- ' + msg.channel + ' is restricted.' );
@@ -144,10 +144,10 @@ client.chat.on( Events.PRIVATE_MESSAGE, msg => {
 		return cmds.LINK(msg, msg.message.split(' ').slice(1).join(' ').trim(), wiki);
 	}, dberror => {
 		console.log( '- Error while getting the wiki: ' + dberror );
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I got an error!' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', I got an error!' );
 	} ).catch( error => {
 		console.log( '- Error while processing the command: ' + error );
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I got an error!' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', I got an error!' );
 	} );
 } );
 

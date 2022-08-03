@@ -27,19 +27,19 @@ function cmd_setrestriction(msg, text, wiki) {
 	if ( !( msg.tags.isModerator || msg.tags.userId === msg.tags.roomId ) ) return this.LINK(msg.channel, msg.message.split(' ').slice(1).join(' ').trim(), wiki);
 	text = text.toLowerCase();
 	if ( !text.length ) return db.query( 'SELECT restriction FROM twitch WHERE id = $1', [msg.tags.roomId] ).then( ({rows: [row]}) => {
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', the restriction is set to ' + row?.restriction + '.' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', the restriction is set to ' + row?.restriction + '.' );
 	}, dberror => {
 		console.log( '- Error while getting the restriction: ' + dberror );
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I couldn\'t get the restriction :(' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', I couldn\'t get the restriction :(' );
 	} );
 	if ( restrictions.hasOwnProperty(text) ) return db.query( 'UPDATE twitch SET restriction = $1 WHERE id = $2', [restrictions[text], msg.tags.roomId] ).then( () => {
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I set the restriction to ' + restrictions[text] + '.' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', I set the restriction to ' + restrictions[text] + '.' );
 		console.log( '- Restriction successfully updated.' );
 	}, dberror => {
 		console.log( '- Error while setting the restriction: ' + dberror );
-		client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', I couldn\'t set the restriction :(' );
+		client.chat.say( msg.channel, '@' + msg.tags.displayName + ', I couldn\'t set the restriction :(' );
 	} );
-	client.chat.say( msg.channel, 'gamepediaWIKIBOT @' + msg.tags.displayName + ', please provide a valid restriction type: everyone, subscribers or moderators' );
+	client.chat.say( msg.channel, '@' + msg.tags.displayName + ', please provide a valid restriction type: everyone, subscribers or moderators' );
 }
 
 export default {

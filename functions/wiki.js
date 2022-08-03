@@ -143,7 +143,7 @@ export default class Wiki extends URL {
 			link.searchParams.append(name, value);
 		} );
 		link.hash = Wiki.toSection(fragment, false, this.spaceReplacement);
-		return link.href;
+		return link.href.replace( /'/g, '%27' );
 	}
 
 	/**

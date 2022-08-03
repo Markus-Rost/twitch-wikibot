@@ -57,7 +57,7 @@ function cmd_link(msg, title, wiki, querystring = new URLSearchParams(), fragmen
 					return;
 				}
 				if ( !srbody.query ) {
-					client.chat.say( msg.channel, 'I couldn\'t find a result for "' + title.text + '" on this wiki :( ' + wiki.toLink() );
+					client.chat.say( msg.channel, 'I couldn\'t find a result for "' + title + '" on this wiki :( ' + wiki.toLink() );
 					return;
 				}
 				querypage = Object.values(srbody.query.pages)[0];

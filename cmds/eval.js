@@ -20,8 +20,8 @@ async function cmd_eval(msg, text, wiki) {
 		text = error.toString();
 	}
 	if ( isDebug ) console.log( '--- EVAL START ---\n' + text + '\n--- EVAL END ---' );
-	if ( text.length > 450 ) client.chat.say( msg.channel, 'gamepediaWIKIBOT ✅' );
-	else client.chat.say( msg.channel, 'gamepediaWIKIBOT ' + text );
+	if ( text.length > 450 ) client.chat.say( msg.channel, '✅' );
+	else client.chat.say( msg.channel, text );
 }
 
 /**
