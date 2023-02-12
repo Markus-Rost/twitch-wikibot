@@ -26,7 +26,7 @@ export default class Wiki extends URL {
 		this.spaceReplacement = '_';
 		let project = inputToWikiProject(this.href);
 		if ( project ) {
-			articlepath = project.fullArticlePath + '$1';
+			articlepath = project.fullArticlePath;
 			this.spaceReplacement = project.wikiProject.urlSpaceReplacement;
 			this.wikifarm = project.wikiProject.wikiFarm;
 			this.centralauth = project.wikiProject.extensions.includes('CentralAuth');
