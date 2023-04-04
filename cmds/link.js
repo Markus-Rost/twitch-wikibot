@@ -1,4 +1,4 @@
-import { wikiProjects } from 'mediawiki-projects-list';
+import { getWikiProject } from 'mediawiki-projects-list';
 import cmd_random from '../functions/random.js';
 import parse_page from '../functions/parse_page.js';
 import Wiki, { toSection } from '../functions/wiki.js';
@@ -120,7 +120,7 @@ function cmd_link(msg, title, wiki, querystring = new URLSearchParams(), fragmen
 						return cmd_link(msg, iwtitle, new Wiki(iw.origin + path + '/'), iw.searchParams, fragment, iw.href);
 					}
 				}
-				let project = wikiProjects.find( project => iw.hostname.endsWith( project.name ) );
+				let project = getWikiProject(iw.hostname);
 				if ( project ) {
 					let articlePath = ( project.regexPaths ? '/' : project.articlePath );
 					let regex = ( iw.host + iw.pathname ).match( new RegExp( '^' + project.regex + '(?:' + articlePath + '|/?$)' ) );
