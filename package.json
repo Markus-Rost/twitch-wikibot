@@ -18,7 +18,7 @@
     "dotenv": "^16.3.1",
     "got": "^13.0.0",
     "got-ssrf": "^2.0.1",
-    "mediawiki-projects-list": "^4.6.6",
+    "mediawiki-projects-list": "^4.6.7",
     "npm": "^10.1.0",
     "pg": "^8.11.3",
     "twitch-js": "^2.0.0-beta.45"
