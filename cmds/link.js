@@ -44,11 +44,6 @@ function cmd_link(msg, title, wiki, querystring = new URLSearchParams(), fragmen
 				querypage.ns = -1;
 				querypage.special = '';
 			}
-			if ( wiki.wikifarm === 'miraheze' && querypage.ns === 0 && /^Mh:[a-z\d]+:/.test(querypage.title) ) {
-				var iw_parts = querypage.title.split(':');
-				var iw = new Wiki('https://' + iw_parts[1] + '.miraheze.org/w/');
-				return cmd_link(msg, iw_parts.slice(2).join(':'), iw, querystring, fragment, iw.toLink(iw_parts.slice(2).join(':'), querystring, fragment));
-			}
 			if ( ( querypage.missing !== undefined && querypage.known === undefined ) || querypage.invalid !== undefined ) return got.get( wiki + 'api.php?action=query&prop=pageprops|extracts&ppprop=description&explaintext=true&exintro=true&exlimit=1&generator=search&gsrnamespace=4|12|14|' + ( querypage.ns >= 0 ? querypage.ns + '|' : '' ) + Object.values(body.query.namespaces).filter( ns => ns.content !== undefined ).map( ns => ns.id ).join('|') + '&gsrlimit=1&gsrsearch=' + encodeURIComponent( title ) + '&format=json' ).then( srresponse => {
 				var srbody = srresponse.body;
 				if ( srresponse.statusCode !== 200 || !srbody || srbody.batchcomplete === undefined ) {

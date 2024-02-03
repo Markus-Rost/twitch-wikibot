@@ -11,15 +11,15 @@
   "author": "MarkusRost",
   "license": "ISC",
   "engines": {
-    "node": ">=18.1.0"
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
-    "dotenv": "^16.3.1",
-    "got": "^13.0.0",
-    "got-ssrf": "^2.0.1",
-    "mediawiki-projects-list": "^4.6.7",
-    "npm": "^10.2.0",
+    "dotenv": "^16.4.1",
+    "got": "^14.2.0",
+    "got-ssrf": "^3.0.0",
+    "mediawiki-projects-list": "^4.6.9",
+    "npm": "^10.4.0",
     "pg": "^8.11.3",
     "twitch-js": "^2.0.0-beta.45"
   },
