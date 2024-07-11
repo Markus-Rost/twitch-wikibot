@@ -19,7 +19,7 @@
     "got": "^14.4.1",
     "got-ssrf": "^3.0.0",
     "mediawiki-projects-list": "^4.7.1",
-    "npm": "^10.8.1",
+    "npm": "^10.8.2",
     "pg": "^8.12.0",
     "twitch-js": "^2.0.0-beta.45"
   },
