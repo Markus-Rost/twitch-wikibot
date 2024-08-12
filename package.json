@@ -14,7 +14,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "cheerio": "^1.0.0-rc.12",
+    "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
     "got": "^14.4.1",
     "got-ssrf": "^3.0.0",
