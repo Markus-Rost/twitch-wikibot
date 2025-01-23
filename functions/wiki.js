@@ -1,6 +1,8 @@
 import { inspect } from 'node:util';
 import { inputToWikiProject } from 'mediawiki-projects-list';
-import { defaultSettings } from './default.json' with { type: 'json' };
+import defaultData from './default.json' with { type: 'json' };
+
+const defaultSettings = defaultData.defaultSettings;
 
 /**
  * A wiki.
