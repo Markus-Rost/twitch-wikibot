@@ -1,8 +1,6 @@
 import { inspect } from 'node:util';
 import { inputToWikiProject } from 'mediawiki-projects-list';
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const {defaultSettings} = require('./default.json');
+import { defaultSettings } from './default.json' with { type: 'json' };
 
 /**
  * A wiki.

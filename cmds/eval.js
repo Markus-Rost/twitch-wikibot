@@ -1,7 +1,5 @@
 import { inspect } from 'node:util';
 import db from '../util/database.js';
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
 
 inspect.defaultOptions = {compact: true, breakLength: Infinity};
 
