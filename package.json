@@ -14,13 +14,13 @@
     "node": ">=23.1.0"
   },
   "dependencies": {
-    "cheerio": "^1.0.0",
-    "dotenv": "^16.4.7",
-    "got": "^14.4.5",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.3",
+    "got": "^14.6.6",
     "got-ssrf": "^3.0.0",
-    "mediawiki-projects-list": "^4.7.4",
-    "npm": "^11.0.0",
-    "pg": "^8.13.1",
+    "mediawiki-projects-list": "^4.9.6",
+    "npm": "^11.7.0",
+    "pg": "^8.16.3",
     "twitch-js": "^2.0.0-beta.45"
   },
   "repository": {
